@@ -1,0 +1,63 @@
+from dataclasses import dataclass
+from decimal import Decimal
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.models.template import TemplateGroup, UserTemplate
+from app.models.user import User
+from app.services.tracking import TrackingService
+
+
+@dataclass(frozen=True)
+class TemplateActivationResult:
+    template_name: str
+    created_count: int
+
+
+class TemplateService:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def list_public(self) -> list[TemplateGroup]:
+        result = await self.session.scalars(
+            select(TemplateGroup)
+            .where(TemplateGroup.is_public.is_(True))
+            .options(selectinload(TemplateGroup.items))
+            .order_by(TemplateGroup.category, TemplateGroup.name)
+        )
+        return list(result)
+
+    async def activate(self, user: User, template_group_id: int) -> TemplateActivationResult | None:
+        template = await self.session.scalar(
+            select(TemplateGroup)
+            .where(TemplateGroup.id == template_group_id, TemplateGroup.is_public.is_(True))
+            .options(selectinload(TemplateGroup.items))
+        )
+        if not template:
+            return None
+
+        existing_link = await self.session.scalar(
+            select(UserTemplate).where(
+                UserTemplate.user_id == user.id,
+                UserTemplate.template_group_id == template.id,
+            )
+        )
+        if existing_link:
+            existing_link.enabled = True
+        else:
+            self.session.add(UserTemplate(user_id=user.id, template_group_id=template.id, enabled=True))
+
+        tracking = TrackingService(self.session)
+        for item in template.items:
+            threshold = Decimal(item.default_threshold) if item.default_threshold is not None else None
+            await tracking.add_item(
+                user=user,
+                item_name=item.item_name,
+                item_type=item.item_type,
+                target_price=threshold,
+            )
+
+        return TemplateActivationResult(template_name=template.name, created_count=len(template.items))
+
