@@ -4,6 +4,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.db.session import async_session_factory
+from app.models import all as _models  # noqa: F401
 from app.models.template import TemplateGroup, TemplateItem
 
 
@@ -82,4 +83,3 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
-

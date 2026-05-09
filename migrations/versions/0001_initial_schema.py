@@ -6,6 +6,7 @@ Create Date: 2026-05-08
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 revision = "0001_initial_schema"
 down_revision = None
@@ -14,9 +15,21 @@ depends_on = None
 
 
 def upgrade() -> None:
-    subscription_type = sa.Enum("free", "pro", name="subscription_type")
-    notification_type = sa.Enum("sale", "price_alert", "system", name="notification_type")
-    integration_type = sa.Enum("poe_trade", "poe_ninja", "funpay", name="integration_type")
+    subscription_type = postgresql.ENUM("free", "pro", name="subscription_type", create_type=False)
+    notification_type = postgresql.ENUM(
+        "sale",
+        "price_alert",
+        "system",
+        name="notification_type",
+        create_type=False,
+    )
+    integration_type = postgresql.ENUM(
+        "poe_trade",
+        "poe_ninja",
+        "funpay",
+        name="integration_type",
+        create_type=False,
+    )
 
     subscription_type.create(op.get_bind(), checkfirst=True)
     notification_type.create(op.get_bind(), checkfirst=True)
@@ -156,4 +169,3 @@ def downgrade() -> None:
     sa.Enum(name="integration_type").drop(op.get_bind(), checkfirst=True)
     sa.Enum(name="notification_type").drop(op.get_bind(), checkfirst=True)
     sa.Enum(name="subscription_type").drop(op.get_bind(), checkfirst=True)
-
