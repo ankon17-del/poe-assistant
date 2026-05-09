@@ -26,12 +26,30 @@ class TrackingService:
         league_name: str | None = None,
     ) -> TrackedItem:
         league = await LeagueService(self.session).get_or_create(league_name or self.settings.default_league_name)
+        normalized_name = item_name.strip()
+        normalized_trade_url = trade_url.strip() if trade_url else None
+
+        existing = await self.session.scalar(
+            select(TrackedItem).where(
+                TrackedItem.user_id == user.id,
+                TrackedItem.league_id == league.id,
+                TrackedItem.item_name == normalized_name,
+                TrackedItem.trade_url.is_(normalized_trade_url) if normalized_trade_url is None else TrackedItem.trade_url == normalized_trade_url,
+            )
+        )
+        if existing:
+            existing.item_type = item_type
+            existing.target_price = target_price
+            existing.notify_enabled = True
+            existing.is_active = True
+            return existing
+
         tracked_item = TrackedItem(
             user_id=user.id,
             league_id=league.id,
-            item_name=item_name.strip(),
+            item_name=normalized_name,
             item_type=item_type,
-            trade_url=trade_url,
+            trade_url=normalized_trade_url,
             target_price=target_price,
         )
         self.session.add(tracked_item)
@@ -42,6 +60,7 @@ class TrackingService:
         result = await self.session.scalars(
             select(TrackedItem)
             .where(TrackedItem.user_id == user.id, TrackedItem.is_active.is_(True))
+            .options(selectinload(TrackedItem.league))
             .order_by(TrackedItem.created_at.desc())
         )
         return list(result)

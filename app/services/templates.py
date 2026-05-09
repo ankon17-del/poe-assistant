@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.tracked_item import TrackedItem
 from app.models.template import TemplateGroup, UserTemplate
 from app.models.user import User
 from app.services.tracking import TrackingService
@@ -49,6 +50,12 @@ class TemplateService:
         else:
             self.session.add(UserTemplate(user_id=user.id, template_group_id=template.id, enabled=True))
 
+        before_count = await self.session.scalar(
+            select(func.count()).select_from(TrackedItem).where(
+                TrackedItem.user_id == user.id,
+                TrackedItem.is_active.is_(True),
+            )
+        )
         tracking = TrackingService(self.session)
         for item in template.items:
             threshold = Decimal(item.default_threshold) if item.default_threshold is not None else None
@@ -59,5 +66,12 @@ class TemplateService:
                 target_price=threshold,
             )
 
-        return TemplateActivationResult(template_name=template.name, created_count=len(template.items))
+        after_count = await self.session.scalar(
+            select(func.count()).select_from(TrackedItem).where(
+                TrackedItem.user_id == user.id,
+                TrackedItem.is_active.is_(True),
+            )
+        )
+        created_count = max(0, (after_count or 0) - (before_count or 0))
 
+        return TemplateActivationResult(template_name=template.name, created_count=created_count)
