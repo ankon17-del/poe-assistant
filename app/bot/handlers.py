@@ -642,6 +642,33 @@ async def remove_tracking_from_list(callback: CallbackQuery) -> None:
     )
 
 
+@router.callback_query(F.data.startswith("list2:remove:"))
+async def remove_tracking_from_list_v2(callback: CallbackQuery) -> None:
+    tracked_item_id = int(callback.data.rsplit(":", 1)[1])
+
+    async with session_scope() as session:
+        user = await ensure_user(session, callback.from_user.id, callback.from_user.username)
+        removed = await TrackingService(session).remove_item(user=user, tracked_item_id=tracked_item_id)
+        items = await TrackingService(session).list_items(user)
+
+    if not removed:
+        await callback.answer("Трекинг уже отключен или не найден", show_alert=True)
+        return
+
+    await callback.answer("Трекинг отключен")
+    if not callback.message:
+        return
+
+    if not items:
+        await callback.message.edit_text("Активного трекинга пока нет. Добавь предмет через /add.")
+        return
+
+    await callback.message.edit_text(
+        build_tracking_list_text(items),
+        reply_markup=tracking_actions_keyboard(items),
+    )
+
+
 @router.callback_query(F.data.startswith("tracking:remove:"))
 async def remove_tracking_callback(callback: CallbackQuery) -> None:
     tracked_item_id = int(callback.data.rsplit(":", 1)[1])
