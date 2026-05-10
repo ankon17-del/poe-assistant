@@ -14,6 +14,7 @@ The project already has a solid MVP foundation:
 - League-first data model is in place, including POE1 / POE2 realm separation.
 - Template packs are seeded and can generate user tracking entries.
 - Currency price alerts are working for supported currency items.
+- `/economy` gives a lightweight league-aware currency snapshot and shows active currency alerts.
 - OAuth groundwork for Path of Exile account/service scopes is implemented.
 
 The product is not yet in a "daily useful" state for general trade tracking, because normal item watchers still do not have a real production-grade trade polling source.
@@ -52,6 +53,7 @@ Additional completed model upgrades:
 - `/remove`
 - `/list`
 - `/stats`
+- `/economy`
 - `/templates`
 - `/settings`
 
@@ -208,8 +210,12 @@ The project should be considered a true MVP only when all of the following are s
 - public/community template marketplace
 - desktop / overlay tools
 
-## Immediate Next Step
+## Immediate Practical Next Step
 
-Build the real trade URL item watcher.
+Because Railway is currently blocked by `403 Forbidden` on the website trade flow, the practical next step is:
 
-That is the single biggest gap between "good prototype" and "actually useful product".
+- strengthen the currency / economy MVP,
+- improve worker stability and observability,
+- keep the item watcher isolated until it can run from a more suitable environment.
+
+The real trade URL item watcher remains an important gap, but it should not block the rest of the product now.

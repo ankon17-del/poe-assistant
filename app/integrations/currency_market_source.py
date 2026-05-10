@@ -27,19 +27,36 @@ class PriceSnapshotDTO:
     raw_payload: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class ExchangeRateSnapshotDTO:
+    league_name: str | None
+    game: str | None
+    source: str
+    rates: dict[str, Decimal]
+    observed_at: datetime
+
+
 class CurrencyMarketSource:
     poe_ninja_base_url = "https://poe.ninja"
     orbwatch_base_url = "https://orbwatch.trade"
     poe2_dev_currency_url = "https://www.poe2.dev/calculators/currency"
 
     async def get_exchange_rates(self, league_name: str, game: str | None) -> dict[str, Decimal] | None:
+        snapshot = await self.get_exchange_snapshot(league_name=league_name, game=game)
+        return snapshot.rates if snapshot else None
+
+    async def get_exchange_snapshot(
+        self,
+        league_name: str,
+        game: str | None,
+    ) -> ExchangeRateSnapshotDTO | None:
         if not league_name:
             return None
 
         if game == "poe2":
-            return await self._get_poe2_exchange_rates()
+            return await self._get_poe2_exchange_snapshot(league_name)
 
-        return await self._get_poe1_exchange_rates(league_name)
+        return await self._get_poe1_exchange_snapshot(league_name)
 
     async def get_price(self, request: TrackingRequest) -> PriceSnapshotDTO | None:
         if request.item_type != "currency" or not request.league_name:
@@ -176,7 +193,7 @@ class CurrencyMarketSource:
             raw_payload=target_entry,
         )
 
-    async def _get_poe1_exchange_rates(self, league_name: str) -> dict[str, Decimal] | None:
+    async def _get_poe1_exchange_snapshot(self, league_name: str) -> ExchangeRateSnapshotDTO | None:
         try:
             payload = await self._fetch_poe1_currency_overview(league_name)
         except (httpx.HTTPError, ValueError):
@@ -197,7 +214,13 @@ class CurrencyMarketSource:
             rates["ex"] = exalted_chaos
         if divine_chaos not in {None, Decimal("0")}:
             rates["div"] = divine_chaos
-        return rates
+        return ExchangeRateSnapshotDTO(
+            league_name=league_name,
+            game="poe1",
+            source="poe.ninja",
+            rates=rates,
+            observed_at=datetime.now(UTC),
+        )
 
     async def _fetch_poe1_currency_overview(self, league_name: str) -> dict[str, Any]:
         async with httpx.AsyncClient(base_url=self.poe_ninja_base_url, timeout=30.0) as client:
@@ -217,7 +240,7 @@ class CurrencyMarketSource:
             response.raise_for_status()
             return response.json()
 
-    async def _get_poe2_exchange_rates(self) -> dict[str, Decimal] | None:
+    async def _get_poe2_exchange_snapshot(self, league_name: str) -> ExchangeRateSnapshotDTO | None:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(self.poe2_dev_currency_url)
@@ -238,7 +261,13 @@ class CurrencyMarketSource:
             rates["ex"] = exalted_chaos
         if divine_chaos not in {None, Decimal("0")}:
             rates["div"] = divine_chaos
-        return rates
+        return ExchangeRateSnapshotDTO(
+            league_name=league_name,
+            game="poe2",
+            source="poe2.dev",
+            rates=rates,
+            observed_at=datetime.now(UTC),
+        )
 
     def _find_currency_entry(self, entries: list[dict[str, Any]], requested_name: str) -> dict[str, Any] | None:
         requested_keys = self._candidate_keys(requested_name)

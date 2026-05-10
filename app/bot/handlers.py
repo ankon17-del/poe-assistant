@@ -21,6 +21,7 @@ from app.bot.keyboards import (
     tracking_actions_keyboard,
 )
 from app.models.league import League
+from app.services.economy import EconomyService
 from app.services.item_catalog import ItemCatalogService
 from app.services.leagues import LeagueService
 from app.services.stats import StatsService
@@ -70,6 +71,43 @@ def build_tracking_list_text(items: list) -> str:
     for item in items:
         lines.append("\n".join(build_tracking_lines(item)))
     return "\n\n".join(lines)
+
+
+def build_economy_text(summaries: list) -> str:
+    lines = ["Экономика:"]
+    for summary in summaries:
+        game_label = "POE 2" if summary.game == "poe2" else "POE 1"
+        lines.append("")
+        lines.append(f"{game_label} / {summary.league_name}")
+
+        snapshot = summary.exchange_snapshot
+        if snapshot:
+            rates = snapshot.rates
+            lines.append(f"Источник: {snapshot.source}")
+            if "div" in rates:
+                lines.append(f"1 div ~= {format_decimal(rates['div'])} chaos")
+            if "ex" in rates:
+                lines.append(f"1 ex ~= {format_decimal(rates['ex'])} chaos")
+            if "div" in rates and "ex" in rates and rates["ex"] != 0:
+                lines.append(f"1 div ~= {format_decimal(rates['div'] / rates['ex'])} ex")
+        else:
+            lines.append("Курсы сейчас недоступны.")
+
+        if summary.active_watchers:
+            lines.append(f"Активные currency alerts: {len(summary.active_watchers)}")
+            for watcher in summary.active_watchers[:5]:
+                lines.append(
+                    f"- #{watcher.tracked_item_id} {watcher.item_name} >= "
+                    f"{format_decimal(watcher.target_price)} {watcher.target_currency}"
+                )
+            if len(summary.active_watchers) > 5:
+                lines.append(f"- ... еще {len(summary.active_watchers) - 5}")
+        else:
+            lines.append("Активных currency alerts пока нет.")
+
+    lines.append("")
+    lines.append("Подсказка: currency alert срабатывает, когда рыночная цена достигает или превышает твой порог.")
+    return "\n".join(lines)
 
 
 def infer_trade_context(trade_url: str) -> tuple[str | None, str | None]:
@@ -796,6 +834,15 @@ async def stats(message: Message) -> None:
         f"Продаж сегодня: {summary.daily_sales}\n"
         f"Валюты сегодня: {format_decimal(summary.daily_currency)}"
     )
+
+
+@router.message(Command("economy"))
+async def economy(message: Message) -> None:
+    async with session_scope() as session:
+        user = await ensure_user(session, message.from_user.id, message.from_user.username)
+        summaries = await EconomyService(session).get_user_economy_summary(user)
+
+    await message.answer(build_economy_text(summaries))
 
 
 @router.message(Command("templates"))
