@@ -1,6 +1,7 @@
 import logging
 
 from app.integrations.currency_market_source import CurrencyMarketSource
+from app.integrations.poe_trade import PoeTradeClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.source_registry import TrackingSourceRegistry
@@ -23,6 +24,7 @@ class TrackingWorker:
         self.source_registry = source_registry
         self.notifier = notifier
         self.currency_market_source = CurrencyMarketSource()
+        self.poe_trade_client = PoeTradeClient()
 
     async def run_once(self) -> None:
         tracking_items = await TrackingService(self.session).list_items_for_polling()
@@ -34,8 +36,11 @@ class TrackingWorker:
         for tracked_item in tracking_items:
             try:
                 request = TrackingService.build_tracking_request(tracked_item)
-                if not request.trade_url and request.target_price is not None:
-                    snapshot = await self.currency_market_source.get_price(request)
+                if request.target_price is not None:
+                    if request.trade_url:
+                        snapshot = await self.poe_trade_client.get_price_snapshot(request)
+                    else:
+                        snapshot = await self.currency_market_source.get_price(request)
                     if snapshot:
                         result = await price_alert_service.process_snapshot(tracked_item=tracked_item, snapshot=snapshot)
                         if result.triggered:

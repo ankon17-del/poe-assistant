@@ -32,6 +32,15 @@ class CurrencyMarketSource:
     orbwatch_base_url = "https://orbwatch.trade"
     poe2_dev_currency_url = "https://www.poe2.dev/calculators/currency"
 
+    async def get_exchange_rates(self, league_name: str, game: str | None) -> dict[str, Decimal] | None:
+        if not league_name:
+            return None
+
+        if game == "poe2":
+            return await self._get_poe2_exchange_rates()
+
+        return await self._get_poe1_exchange_rates(league_name)
+
     async def get_price(self, request: TrackingRequest) -> PriceSnapshotDTO | None:
         if request.item_type != "currency" or not request.league_name:
             return None
@@ -130,17 +139,7 @@ class CurrencyMarketSource:
 
     async def _get_poe1_currency_price(self, request: TrackingRequest) -> PriceSnapshotDTO | None:
         try:
-            async with httpx.AsyncClient(base_url=self.poe_ninja_base_url, timeout=30.0) as client:
-                response = await client.get(
-                    "/api/data/currencyoverview",
-                    params={
-                        "league": request.league_name,
-                        "type": "Currency",
-                        "date": date.today().isoformat(),
-                    },
-                )
-                response.raise_for_status()
-                payload = response.json()
+            payload = await self._fetch_poe1_currency_overview(request.league_name)
         except (httpx.HTTPError, ValueError):
             logger.exception("Failed to fetch POE1 currency market data for %s", request.league_name)
             return None
@@ -176,6 +175,70 @@ class CurrencyMarketSource:
             observed_at=datetime.now(UTC),
             raw_payload=target_entry,
         )
+
+    async def _get_poe1_exchange_rates(self, league_name: str) -> dict[str, Decimal] | None:
+        try:
+            payload = await self._fetch_poe1_currency_overview(league_name)
+        except (httpx.HTTPError, ValueError):
+            logger.warning("POE1 exchange rates unavailable for %s", league_name)
+            return None
+
+        lines = payload.get("lines", [])
+        if not isinstance(lines, list) or not lines:
+            return None
+
+        divine_entry = self._find_currency_entry(lines, "Divine Orb")
+        exalted_entry = self._find_currency_entry(lines, "Exalted Orb")
+        divine_chaos = self._extract_decimal(divine_entry.get("chaosEquivalent")) if divine_entry else None
+        exalted_chaos = self._extract_decimal(exalted_entry.get("chaosEquivalent")) if exalted_entry else None
+
+        rates = {"chaos": Decimal("1")}
+        if exalted_chaos not in {None, Decimal("0")}:
+            rates["ex"] = exalted_chaos
+        if divine_chaos not in {None, Decimal("0")}:
+            rates["div"] = divine_chaos
+        return rates
+
+    async def _fetch_poe1_currency_overview(self, league_name: str) -> dict[str, Any]:
+        async with httpx.AsyncClient(base_url=self.poe_ninja_base_url, timeout=30.0) as client:
+            response = await client.get(
+                "/api/data/currencyoverview",
+                params={"league": league_name, "type": "Currency"},
+            )
+            if response.status_code == 404:
+                response = await client.get(
+                    "/api/data/currencyoverview",
+                    params={
+                        "league": league_name,
+                        "type": "Currency",
+                        "date": date.today().isoformat(),
+                    },
+                )
+            response.raise_for_status()
+            return response.json()
+
+    async def _get_poe2_exchange_rates(self) -> dict[str, Decimal] | None:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(self.poe2_dev_currency_url)
+                response.raise_for_status()
+                html = response.text
+        except httpx.HTTPError:
+            logger.warning("POE2 exchange rates unavailable")
+            return None
+
+        values_by_name = self._extract_poe2_dev_chaos_values(html)
+        if not values_by_name:
+            return None
+
+        rates = {"chaos": Decimal("1")}
+        exalted_chaos = self._find_named_value(values_by_name, "Exalted Orb")
+        divine_chaos = self._find_named_value(values_by_name, "Divine Orb")
+        if exalted_chaos not in {None, Decimal("0")}:
+            rates["ex"] = exalted_chaos
+        if divine_chaos not in {None, Decimal("0")}:
+            rates["div"] = divine_chaos
+        return rates
 
     def _find_currency_entry(self, entries: list[dict[str, Any]], requested_name: str) -> dict[str, Any] | None:
         requested_keys = self._candidate_keys(requested_name)

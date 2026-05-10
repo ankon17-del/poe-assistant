@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
+from urllib.parse import urlparse
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
@@ -69,6 +70,18 @@ def build_tracking_list_text(items: list) -> str:
     for item in items:
         lines.append("\n".join(build_tracking_lines(item)))
     return "\n\n".join(lines)
+
+
+def infer_trade_context(trade_url: str) -> tuple[str | None, str | None]:
+    parsed = urlparse(trade_url)
+    segments = [segment for segment in parsed.path.split("/") if segment]
+    if len(segments) >= 4 and segments[0] == "trade" and segments[1] == "search":
+        return "poe1", segments[2]
+    if len(segments) >= 5 and segments[0] == "trade2" and segments[1] == "search":
+        realm = segments[2]
+        league_name = segments[3]
+        return ("poe2" if realm == "poe2" else realm, league_name)
+    return None, None
 
 
 def normalize_threshold_currency(raw_value: str) -> str:
@@ -275,8 +288,16 @@ async def add_tracking(message: Message, state: FSMContext) -> None:
     target_currency = "ex"
 
     if trade_url:
+        game, league_name = infer_trade_context(trade_url)
         await state.clear()
-        await state.update_data(item_type="item", trade_url=trade_url, target_price=None, target_currency="ex")
+        await state.update_data(
+            item_type="item",
+            trade_url=trade_url,
+            target_price=None,
+            target_currency="ex",
+            game=game,
+            league_name=league_name,
+        )
         await state.set_state(AddTrackingStates.entering_trade_name)
         await show_wizard_message(
             state=state,
@@ -532,7 +553,15 @@ async def add_enter_trade_url(message: Message, state: FSMContext) -> None:
         return
 
     await delete_if_possible(message)
-    await state.update_data(trade_url=trade_url, item_type="item", target_price=None, target_currency="ex")
+    game, league_name = infer_trade_context(trade_url)
+    await state.update_data(
+        trade_url=trade_url,
+        item_type="item",
+        target_price=None,
+        target_currency="ex",
+        game=game,
+        league_name=league_name,
+    )
     await state.set_state(AddTrackingStates.entering_trade_name)
     await show_wizard_message(
         state=state,
