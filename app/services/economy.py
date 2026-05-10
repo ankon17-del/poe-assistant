@@ -13,6 +13,7 @@ from app.integrations.currency_market_source import CurrencyMarketSource, Exchan
 from app.integrations.tracking_source import TrackingRequest
 from app.models.tracked_item import TrackedItem
 from app.models.user import User
+from app.services.leagues import LeagueService
 
 
 @dataclass(frozen=True)
@@ -45,9 +46,8 @@ class EconomyService:
                 continue
             grouped.setdefault((item.league.realm, item.league.name), []).append(item)
 
-        if not grouped:
-            fallback_game = "poe2" if "poe2" in self.settings.default_league_name.lower() else "poe1"
-            grouped[(fallback_game, self.settings.default_league_name)] = []
+        for realm, league_name in self._baseline_league_pairs():
+            grouped.setdefault((realm, league_name), [])
 
         summaries: list[LeagueEconomySummary] = []
         for (game, league_name), items in sorted(grouped.items(), key=lambda entry: (entry[0][0], entry[0][1])):
@@ -72,6 +72,20 @@ class EconomyService:
             )
 
         return summaries
+
+    def _baseline_league_pairs(self) -> list[tuple[str, str]]:
+        pairs: list[tuple[str, str]] = []
+        for realm in ("poe1", "poe2"):
+            defaults = LeagueService.DEFAULT_LEAGUES.get(realm, [])
+            if defaults:
+                pairs.append((realm, defaults[0]))
+
+        default_game = "poe2" if "poe2" in self.settings.default_league_name.lower() else "poe1"
+        default_pair = (default_game, self.settings.default_league_name)
+        if default_pair not in pairs:
+            pairs.append(default_pair)
+
+        return pairs
 
     async def _build_snapshot_from_currency_prices(
         self,

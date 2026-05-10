@@ -391,17 +391,12 @@ class CurrencyMarketSource:
             itemdata_response.raise_for_status()
             itemdata = itemdata_response.json()
 
-            wanted = {name.lower() for name in item_names}
-            items_by_name = {
-                str(entry.get("name", "")).lower(): entry
-                for entry in itemdata
-                if isinstance(entry, dict)
-                and str(entry.get("name", "")).lower() in wanted
-            }
-
             results: dict[str, dict[str, Any]] = {}
-            for item_name in wanted:
-                item_entry = items_by_name.get(item_name)
+            for requested_name in item_names:
+                item_entry = self._find_currency_entry(
+                    [entry for entry in itemdata if isinstance(entry, dict)],
+                    requested_name,
+                )
                 if not item_entry:
                     continue
 
@@ -421,14 +416,22 @@ class CurrencyMarketSource:
                         league_entry
                         for league_entry in leagues
                         if isinstance(league_entry, dict)
-                        and str(league_entry.get("name", "")).lower() == league_name.lower()
+                        and self._league_name_matches(league_entry, league_name)
                     ),
                     None,
                 )
                 if match:
-                    results[item_name] = match
+                    results[requested_name.lower()] = match
 
             return results
+
+    def _league_name_matches(self, league_entry: dict[str, Any], league_name: str) -> bool:
+        requested_keys = self._candidate_keys(league_name)
+        for key in ("name", "display", "league", "id"):
+            value = league_entry.get(key)
+            if isinstance(value, str) and requested_keys & self._candidate_keys(value):
+                return True
+        return False
 
     def _find_currency_entry(self, entries: list[dict[str, Any]], requested_name: str) -> dict[str, Any] | None:
         requested_keys = self._candidate_keys(requested_name)
