@@ -46,7 +46,7 @@ class EconomyService:
                 continue
             grouped.setdefault((item.league.realm, item.league.name), []).append(item)
 
-        for realm, league_name in self._baseline_league_pairs():
+        for realm, league_name in await self._baseline_league_pairs():
             grouped.setdefault((realm, league_name), [])
 
         summaries: list[LeagueEconomySummary] = []
@@ -73,9 +73,15 @@ class EconomyService:
 
         return summaries
 
-    def _baseline_league_pairs(self) -> list[tuple[str, str]]:
+    async def _baseline_league_pairs(self) -> list[tuple[str, str]]:
         pairs: list[tuple[str, str]] = []
+        league_service = LeagueService(self.session)
         for realm in ("poe1", "poe2"):
+            options = await league_service.list_selection_options(realm)
+            if options:
+                pairs.append((realm, options[0].name))
+                continue
+
             defaults = LeagueService.DEFAULT_LEAGUES.get(realm, [])
             if defaults:
                 pairs.append((realm, defaults[0]))

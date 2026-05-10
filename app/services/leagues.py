@@ -6,7 +6,7 @@ from app.models.league import League
 
 class LeagueService:
     DEFAULT_LEAGUES: dict[str, list[str]] = {
-        "poe1": ["Standard", "Hardcore"],
+        "poe1": ["Mirage", "Standard", "Hardcore"],
         "poe2": ["POE2 Standard"],
     }
 

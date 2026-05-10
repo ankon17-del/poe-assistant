@@ -192,6 +192,10 @@ class CurrencyMarketSource:
         exalted_entry = self._find_currency_entry(lines, "Exalted Orb")
         divine_chaos = self._extract_decimal(divine_entry.get("chaosEquivalent")) if divine_entry else None
         exalted_chaos = self._extract_decimal(exalted_entry.get("chaosEquivalent")) if exalted_entry else None
+        resolved_league = payload.get("_resolved_league", request.league_name)
+        source_label = "poe.ninja"
+        if resolved_league and request.league_name and resolved_league.lower() != request.league_name.lower():
+            source_label = f"poe.ninja ({resolved_league} fallback)"
 
         return PriceSnapshotDTO(
             item_name=request.item_name,
@@ -203,7 +207,7 @@ class CurrencyMarketSource:
                 divine_chaos=divine_chaos,
             ),
             league_name=request.league_name,
-            source="poe.ninja",
+            source=source_label,
             observed_at=datetime.now(UTC),
             raw_payload=target_entry,
         )
@@ -227,6 +231,7 @@ class CurrencyMarketSource:
         exalted_entry = self._find_currency_entry(lines, "Exalted Orb")
         divine_chaos = self._extract_decimal(divine_entry.get("chaosEquivalent")) if divine_entry else None
         exalted_chaos = self._extract_decimal(exalted_entry.get("chaosEquivalent")) if exalted_entry else None
+        resolved_league = payload.get("_resolved_league", league_name)
 
         rates = {"chaos": Decimal("1")}
         if exalted_chaos not in {None, Decimal("0")}:
@@ -239,17 +244,23 @@ class CurrencyMarketSource:
                 league_name,
             )
             return await self._get_poe1_exchange_snapshot_from_poe_watch(league_name)
+        source_label = "poe.ninja"
+        if resolved_league and resolved_league.lower() != league_name.lower():
+            source_label = f"poe.ninja ({resolved_league} fallback)"
         return ExchangeRateSnapshotDTO(
             league_name=league_name,
             game="poe1",
-            source="poe.ninja",
+            source=source_label,
             rates=rates,
             observed_at=datetime.now(UTC),
         )
 
     async def _get_poe1_currency_price_from_poe_watch(self, request: TrackingRequest) -> PriceSnapshotDTO | None:
         try:
-            lines = await self._fetch_poe_watch_currency_lines(request.league_name, [request.item_name, "Divine Orb", "Exalted Orb"])
+            lines, resolved_league = await self._fetch_poe_watch_currency_lines(
+                request.league_name,
+                [request.item_name, "Divine Orb", "Exalted Orb"],
+            )
         except (httpx.HTTPError, ValueError):
             logger.exception("Failed to fetch POE1 currency fallback data from poe.watch for %s", request.league_name)
             return None
@@ -270,6 +281,9 @@ class CurrencyMarketSource:
             divine_chaos = self._extract_decimal(divine_entry.get("mean")) or self._extract_decimal(divine_entry.get("median"))
         if exalted_entry:
             exalted_chaos = self._extract_decimal(exalted_entry.get("mean")) or self._extract_decimal(exalted_entry.get("median"))
+        source_label = "poe.watch"
+        if resolved_league and request.league_name and resolved_league.lower() != request.league_name.lower():
+            source_label = f"poe.watch ({resolved_league} fallback)"
 
         return PriceSnapshotDTO(
             item_name=request.item_name,
@@ -281,14 +295,14 @@ class CurrencyMarketSource:
                 divine_chaos=divine_chaos,
             ),
             league_name=request.league_name,
-            source="poe.watch",
+            source=source_label,
             observed_at=datetime.now(UTC),
             raw_payload=target_entry,
         )
 
     async def _get_poe1_exchange_snapshot_from_poe_watch(self, league_name: str) -> ExchangeRateSnapshotDTO | None:
         try:
-            lines = await self._fetch_poe_watch_currency_lines(league_name, ["Divine Orb", "Exalted Orb"])
+            lines, resolved_league = await self._fetch_poe_watch_currency_lines(league_name, ["Divine Orb", "Exalted Orb"])
         except (httpx.HTTPError, ValueError):
             logger.warning("POE1 exchange rate fallback unavailable for %s", league_name)
             return None
@@ -309,42 +323,47 @@ class CurrencyMarketSource:
             rates["div"] = divine_chaos
         if len(rates) == 1:
             return None
+        source_label = "poe.watch"
+        if resolved_league and resolved_league.lower() != league_name.lower():
+            source_label = f"poe.watch ({resolved_league} fallback)"
 
         return ExchangeRateSnapshotDTO(
             league_name=league_name,
             game="poe1",
-            source="poe.watch",
+            source=source_label,
             rates=rates,
             observed_at=datetime.now(UTC),
         )
 
     async def _fetch_poe1_currency_overview(self, league_name: str) -> dict[str, Any]:
         async with httpx.AsyncClient(base_url=self.poe_ninja_base_url, timeout=30.0) as client:
-            candidate_params = [
-                {"league": league_name, "type": "Currency", "language": "en"},
-                {"league": league_name, "type": "Currency", "date": date.today().isoformat(), "language": "en"},
-                {
-                    "league": league_name,
-                    "type": "Currency",
-                    "date": (date.today() - timedelta(days=1)).isoformat(),
-                    "language": "en",
-                },
-            ]
-
             last_response: httpx.Response | None = None
-            for params in candidate_params:
-                response = await client.get(
-                    "/api/data/currencyoverview",
-                    params=params,
-                )
-                last_response = response
-                if response.status_code >= 400:
-                    continue
+            for candidate_league in self._poe1_league_candidates(league_name):
+                candidate_params = [
+                    {"league": candidate_league, "type": "Currency", "language": "en"},
+                    {"league": candidate_league, "type": "Currency", "date": date.today().isoformat(), "language": "en"},
+                    {
+                        "league": candidate_league,
+                        "type": "Currency",
+                        "date": (date.today() - timedelta(days=1)).isoformat(),
+                        "language": "en",
+                    },
+                ]
 
-                payload = response.json()
-                lines = payload.get("lines", [])
-                if isinstance(lines, list) and lines:
-                    return payload
+                for params in candidate_params:
+                    response = await client.get(
+                        "/api/data/currencyoverview",
+                        params=params,
+                    )
+                    last_response = response
+                    if response.status_code >= 400:
+                        continue
+
+                    payload = response.json()
+                    lines = payload.get("lines", [])
+                    if isinstance(lines, list) and lines:
+                        payload["_resolved_league"] = candidate_league
+                        return payload
 
             if last_response is None:
                 raise httpx.HTTPError("No response received from poe.ninja currency overview")
@@ -385,45 +404,54 @@ class CurrencyMarketSource:
         self,
         league_name: str,
         item_names: list[str],
-    ) -> dict[str, dict[str, Any]]:
+    ) -> tuple[dict[str, dict[str, Any]], str]:
         async with httpx.AsyncClient(base_url=self.poe_watch_base_url, timeout=30.0) as client:
             itemdata_response = await client.get("/itemdata")
             itemdata_response.raise_for_status()
             itemdata = itemdata_response.json()
 
-            results: dict[str, dict[str, Any]] = {}
-            for requested_name in item_names:
-                item_entry = self._find_currency_entry(
-                    [entry for entry in itemdata if isinstance(entry, dict)],
-                    requested_name,
-                )
-                if not item_entry:
-                    continue
+            item_entries = [entry for entry in itemdata if isinstance(entry, dict)]
+            for candidate_league in self._poe1_league_candidates(league_name):
+                results: dict[str, dict[str, Any]] = {}
+                for requested_name in item_names:
+                    item_entry = self._find_currency_entry(item_entries, requested_name)
+                    if not item_entry:
+                        continue
 
-                item_id = item_entry.get("id")
-                if item_id is None:
-                    continue
+                    item_id = item_entry.get("id")
+                    if item_id is None:
+                        continue
 
-                item_response = await client.get("/item", params={"id": item_id})
-                item_response.raise_for_status()
-                payload = item_response.json()
-                leagues = payload.get("leagues", [])
-                if not isinstance(leagues, list):
-                    continue
+                    item_response = await client.get("/item", params={"id": item_id})
+                    item_response.raise_for_status()
+                    payload = item_response.json()
+                    leagues = payload.get("leagues", [])
+                    if not isinstance(leagues, list):
+                        continue
 
-                match = next(
-                    (
-                        league_entry
-                        for league_entry in leagues
-                        if isinstance(league_entry, dict)
-                        and self._league_name_matches(league_entry, league_name)
-                    ),
-                    None,
-                )
-                if match:
-                    results[requested_name.lower()] = match
+                    match = next(
+                        (
+                            league_entry
+                            for league_entry in leagues
+                            if isinstance(league_entry, dict)
+                            and self._league_name_matches(league_entry, candidate_league)
+                        ),
+                        None,
+                    )
+                    if match:
+                        results[requested_name.lower()] = match
 
-            return results
+                if results:
+                    return results, candidate_league
+
+            return {}, league_name
+
+    @staticmethod
+    def _poe1_league_candidates(league_name: str) -> list[str]:
+        candidates = [league_name]
+        if league_name.lower() != "standard":
+            candidates.append("Standard")
+        return candidates
 
     def _league_name_matches(self, league_entry: dict[str, Any], league_name: str) -> bool:
         requested_keys = self._candidate_keys(league_name)
