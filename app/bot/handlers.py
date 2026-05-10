@@ -87,8 +87,24 @@ def build_paused_alerts_text(items: list) -> str:
     return "\n\n".join(lines)
 
 
-def build_economy_text(summaries: list) -> str:
+def build_economy_text(summaries: list, overview) -> str:
     lines = ["Экономика:"]
+    lines.append("")
+    lines.append(f"Активные currency alerts: {overview.total_active_currency_alerts}")
+    lines.append(f"Сработавшие alerts на паузе: {overview.total_paused_currency_alerts}")
+    if overview.top_watched_currencies:
+        lines.append("Топ отслеживаемых валют:")
+        for entry in overview.top_watched_currencies:
+            line = f"- {entry.item_name}: {entry.total_watchers}"
+            details = []
+            if entry.active_watchers:
+                details.append(f"активных {entry.active_watchers}")
+            if entry.paused_watchers:
+                details.append(f"на паузе {entry.paused_watchers}")
+            if details:
+                line += f" ({', '.join(details)})"
+            lines.append(line)
+
     for summary in summaries:
         game_label = "POE 2" if summary.game == "poe2" else "POE 1"
         lines.append("")
@@ -1018,9 +1034,9 @@ async def stats(message: Message) -> None:
 async def economy(message: Message) -> None:
     async with session_scope() as session:
         user = await ensure_user(session, message.from_user.id, message.from_user.username)
-        summaries = await EconomyService(session).get_user_economy_summary(user)
+        summaries, overview = await EconomyService(session).get_user_economy_dashboard(user)
 
-    await message.answer(build_economy_text(summaries))
+    await message.answer(build_economy_text(summaries, overview))
 
 
 @router.message(Command("templates"))

@@ -33,6 +33,24 @@ class LeagueEconomySummary:
     paused_watchers: list[CurrencyWatcherSummary]
 
 
+@dataclass(frozen=True)
+class TopWatchedCurrencySummary:
+    item_name: str
+    active_watchers: int
+    paused_watchers: int
+
+    @property
+    def total_watchers(self) -> int:
+        return self.active_watchers + self.paused_watchers
+
+
+@dataclass(frozen=True)
+class EconomyOverviewSummary:
+    total_active_currency_alerts: int
+    total_paused_currency_alerts: int
+    top_watched_currencies: list[TopWatchedCurrencySummary]
+
+
 class EconomyService:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -92,6 +110,41 @@ class EconomyService:
             )
 
         return summaries
+
+    async def get_user_economy_dashboard(
+        self,
+        user: User,
+    ) -> tuple[list[LeagueEconomySummary], EconomyOverviewSummary]:
+        summaries = await self.get_user_economy_summary(user)
+        active_items = await self._list_active_currency_watchers(user)
+        paused_items = await self._list_paused_currency_watchers(user)
+
+        counters: dict[str, dict[str, int]] = {}
+        for item in active_items:
+            entry = counters.setdefault(item.item_name, {"active": 0, "paused": 0})
+            entry["active"] += 1
+        for item in paused_items:
+            entry = counters.setdefault(item.item_name, {"active": 0, "paused": 0})
+            entry["paused"] += 1
+
+        top_watched = [
+            TopWatchedCurrencySummary(
+                item_name=item_name,
+                active_watchers=counts["active"],
+                paused_watchers=counts["paused"],
+            )
+            for item_name, counts in sorted(
+                counters.items(),
+                key=lambda item: (-(item[1]["active"] + item[1]["paused"]), -item[1]["active"], item[0].lower()),
+            )[:5]
+        ]
+
+        overview = EconomyOverviewSummary(
+            total_active_currency_alerts=len(active_items),
+            total_paused_currency_alerts=len(paused_items),
+            top_watched_currencies=top_watched,
+        )
+        return summaries, overview
 
     async def _baseline_league_pairs(self) -> list[tuple[str, str]]:
         pairs: list[tuple[str, str]] = []
