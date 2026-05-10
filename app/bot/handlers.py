@@ -291,6 +291,7 @@ async def start(message: Message) -> None:
         "Быстрый старт:\n"
         "/add\n"
         "/list\n"
+        "/economy\n"
         "/templates\n\n"
         "Через /add можно выбрать игру, лигу, предмет и порог без ручного ввода длинной команды."
     )
@@ -307,6 +308,7 @@ async def help_command(message: Message) -> None:
         "/remove <id> - отключить трекинг\n"
         "/list - список активного трекинга\n"
         "/stats - статистика продаж\n"
+        "/economy - курсы валют и активные currency alerts\n"
         "/templates - готовые наборы\n"
         "/settings - текущие настройки MVP"
     )
