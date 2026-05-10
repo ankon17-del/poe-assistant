@@ -841,6 +841,20 @@ async def stats(message: Message) -> None:
         f"Валюты сегодня: {format_decimal(summary.daily_currency)}"
     )
 
+    await message.answer(
+        "\n".join(
+            [
+                "Состояние трекинга:",
+                f"Активные трекеры: {summary.active_trackers}",
+                f"Currency alerts: {summary.active_currency_alerts}",
+                f"Trade URL watcher'ы: {summary.active_trade_url_watchers}",
+                f"Item watcher'ы: {summary.active_item_watchers}",
+                f"POE 1 трекеры: {summary.poe1_trackers}",
+                f"POE 2 трекеры: {summary.poe2_trackers}",
+            ]
+        )
+    )
+
 
 @router.message(Command("economy"))
 async def economy(message: Message) -> None:
