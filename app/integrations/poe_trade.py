@@ -25,6 +25,12 @@ class TradeApiPaths:
 
 
 class PoeTradeClient:
+    browser_like_user_agent = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/136.0.0.0 Safari/537.36"
+    )
+
     def __init__(self):
         self.settings = get_settings()
         self.currency_market_source = CurrencyMarketSource()
@@ -40,26 +46,10 @@ class PoeTradeClient:
         if not paths:
             return None
 
-        headers = self._build_headers(paths.referer)
-        try:
-            async with httpx.AsyncClient(headers=headers, timeout=30.0, follow_redirects=True) as client:
-                shared_query = await self._fetch_shared_query(client, paths.shared_query_url)
-                if not shared_query:
-                    return None
-
-                search_payload = await self._execute_search(client, paths.search_url, shared_query)
-                result_ids = search_payload.get("result", [])
-                if not isinstance(result_ids, list) or not result_ids:
-                    return None
-
-                listings = await self._fetch_listings(
-                    client=client,
-                    fetch_url=paths.fetch_url,
-                    search_id=str(search_payload.get("id", "")),
-                    result_ids=result_ids[:10],
-                )
-        except httpx.HTTPError:
-            logger.exception("Failed to poll trade market for %s", request.trade_url)
+        listings = await self._run_trade_flow(paths, request.trade_url, use_browser_fallback=False)
+        if listings is None:
+            listings = await self._run_trade_flow(paths, request.trade_url, use_browser_fallback=True)
+        if listings is None:
             return None
 
         if not listings:
@@ -104,6 +94,46 @@ class PoeTradeClient:
                 "item": item_payload,
             },
         )
+
+    async def _run_trade_flow(
+        self,
+        paths: TradeApiPaths,
+        trade_url: str,
+        *,
+        use_browser_fallback: bool,
+    ) -> list[dict[str, Any]] | None:
+        headers = self._build_headers(paths.referer, browser_like=use_browser_fallback)
+        try:
+            async with httpx.AsyncClient(
+                headers=headers,
+                timeout=30.0,
+                follow_redirects=True,
+                trust_env=False,
+            ) as client:
+                shared_query = await self._fetch_shared_query(client, paths.shared_query_url)
+                if not shared_query:
+                    return None
+
+                search_payload = await self._execute_search(client, paths.search_url, shared_query)
+                result_ids = search_payload.get("result", [])
+                if not isinstance(result_ids, list) or not result_ids:
+                    return []
+
+                return await self._fetch_listings(
+                    client=client,
+                    fetch_url=paths.fetch_url,
+                    search_id=str(search_payload.get("id", "")),
+                    result_ids=result_ids[:10],
+                )
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 403 and not use_browser_fallback:
+                logger.warning("PoE trade blocked default headers for %s, retrying with browser-like headers", trade_url)
+                return None
+            logger.exception("Failed to poll trade market for %s", trade_url)
+            return None
+        except httpx.HTTPError:
+            logger.exception("Failed to poll trade market for %s", trade_url)
+            return None
 
     async def _fetch_shared_query(self, client: httpx.AsyncClient, shared_query_url: str) -> dict[str, Any] | None:
         response = await client.get(shared_query_url)
@@ -251,9 +281,9 @@ class PoeTradeClient:
 
         return None
 
-    def _build_headers(self, referer: str) -> dict[str, str]:
+    def _build_headers(self, referer: str, *, browser_like: bool) -> dict[str, str]:
         return {
-            "User-Agent": self.settings.poe_api_user_agent,
+            "User-Agent": self.browser_like_user_agent if browser_like else self.settings.poe_api_user_agent,
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "en-US,en;q=0.9",
             "Referer": referer,
