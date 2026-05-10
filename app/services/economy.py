@@ -30,6 +30,7 @@ class LeagueEconomySummary:
     league_name: str
     exchange_snapshot: ExchangeRateSnapshotDTO | None
     active_watchers: list[CurrencyWatcherSummary]
+    paused_watchers: list[CurrencyWatcherSummary]
 
 
 class EconomyService:
@@ -40,17 +41,27 @@ class EconomyService:
 
     async def get_user_economy_summary(self, user: User) -> list[LeagueEconomySummary]:
         currency_items = await self._list_active_currency_watchers(user)
+        paused_currency_items = await self._list_paused_currency_watchers(user)
         grouped: dict[tuple[str, str], list[TrackedItem]] = {}
+        paused_grouped: dict[tuple[str, str], list[TrackedItem]] = {}
         for item in currency_items:
             if not item.league:
                 continue
             grouped.setdefault((item.league.realm, item.league.name), []).append(item)
+        for item in paused_currency_items:
+            if not item.league:
+                continue
+            paused_grouped.setdefault((item.league.realm, item.league.name), []).append(item)
 
         for realm, league_name in await self._baseline_league_pairs():
             grouped.setdefault((realm, league_name), [])
+            paused_grouped.setdefault((realm, league_name), [])
 
         summaries: list[LeagueEconomySummary] = []
-        for (game, league_name), items in sorted(grouped.items(), key=lambda entry: (entry[0][0], entry[0][1])):
+        all_keys = sorted(set(grouped.keys()) | set(paused_grouped.keys()), key=lambda entry: (entry[0], entry[1]))
+        for game, league_name in all_keys:
+            items = grouped.get((game, league_name), [])
+            paused_items = paused_grouped.get((game, league_name), [])
             exchange_snapshot = await self.currency_market_source.get_exchange_snapshot(league_name=league_name, game=game)
             if exchange_snapshot is None:
                 exchange_snapshot = await self._build_snapshot_from_currency_prices(league_name=league_name, game=game)
@@ -67,6 +78,15 @@ class EconomyService:
                             target_currency=item.target_currency,
                         )
                         for item in items
+                    ],
+                    paused_watchers=[
+                        CurrencyWatcherSummary(
+                            tracked_item_id=item.id,
+                            item_name=item.item_name,
+                            target_price=Decimal(item.target_price),
+                            target_currency=item.target_currency,
+                        )
+                        for item in paused_items
                     ],
                 )
             )
@@ -151,6 +171,22 @@ class EconomyService:
                 TrackedItem.user_id == user.id,
                 TrackedItem.is_active.is_(True),
                 TrackedItem.notify_enabled.is_(True),
+                TrackedItem.item_type == "currency",
+                TrackedItem.target_price.is_not(None),
+                TrackedItem.trade_url.is_(None),
+            )
+            .options(selectinload(TrackedItem.league))
+            .order_by(TrackedItem.league_id.asc(), TrackedItem.created_at.desc())
+        )
+        return list(result)
+
+    async def _list_paused_currency_watchers(self, user: User) -> list[TrackedItem]:
+        result = await self.session.scalars(
+            select(TrackedItem)
+            .where(
+                TrackedItem.user_id == user.id,
+                TrackedItem.is_active.is_(True),
+                TrackedItem.notify_enabled.is_(False),
                 TrackedItem.item_type == "currency",
                 TrackedItem.target_price.is_not(None),
                 TrackedItem.trade_url.is_(None),

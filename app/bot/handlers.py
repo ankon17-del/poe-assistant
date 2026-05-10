@@ -123,6 +123,17 @@ def build_economy_text(summaries: list) -> str:
         else:
             lines.append("Активных currency alerts пока нет.")
 
+        if summary.paused_watchers:
+            lines.append(f"Сработавшие alerts на паузе: {len(summary.paused_watchers)}")
+            for watcher in summary.paused_watchers[:3]:
+                lines.append(
+                    f"- #{watcher.tracked_item_id} {watcher.item_name} "
+                    f"({format_decimal(watcher.target_price)} {watcher.target_currency})"
+                )
+            if len(summary.paused_watchers) > 3:
+                lines.append(f"- ... еще {len(summary.paused_watchers) - 3}")
+            lines.append("Открой /alerts, чтобы быстро перезапустить их.")
+
     lines.append("")
     lines.append("Подсказка: currency alert срабатывает, когда рыночная цена достигает или превышает твой порог.")
     return "\n".join(lines)
@@ -987,6 +998,7 @@ async def stats(message: Message) -> None:
                 "Состояние трекинга:",
                 f"Активные трекеры: {summary.active_trackers}",
                 f"Currency alerts: {summary.active_currency_alerts}",
+                f"Сработавшие alerts на паузе: {summary.paused_price_alerts}",
                 f"Trade URL watcher'ы: {summary.active_trade_url_watchers}",
                 f"Item watcher'ы: {summary.active_item_watchers}",
                 f"POE 1 трекеры: {summary.poe1_trackers}",
@@ -994,6 +1006,12 @@ async def stats(message: Message) -> None:
             ]
         )
     )
+
+    if summary.paused_price_alerts:
+        await message.answer(
+            f"Сейчас на паузе alerts: {summary.paused_price_alerts}.\n"
+            "Открой /alerts, чтобы быстро вернуть их в работу."
+        )
 
 
 @router.message(Command("economy"))

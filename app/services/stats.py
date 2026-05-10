@@ -22,6 +22,7 @@ class StatsSummary:
     daily_currency: Decimal
     active_trackers: int
     active_currency_alerts: int
+    paused_price_alerts: int
     active_trade_url_watchers: int
     active_item_watchers: int
     poe1_trackers: int
@@ -86,6 +87,11 @@ class StatsService:
                 1
                 for item in tracked_items
                 if item.item_type == "currency" and item.target_price is not None and item.notify_enabled
+            ),
+            paused_price_alerts=sum(
+                1
+                for item in tracked_items
+                if item.item_type == "currency" and item.target_price is not None and not item.notify_enabled
             ),
             active_trade_url_watchers=sum(1 for item in tracked_items if item.trade_url),
             active_item_watchers=sum(1 for item in tracked_items if item.item_type == "item" and not item.trade_url),
