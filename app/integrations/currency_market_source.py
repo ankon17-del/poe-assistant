@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
+from html import unescape
+import re
 from typing import Any
 
 import httpx
@@ -27,6 +29,7 @@ class PriceSnapshotDTO:
 class CurrencyMarketSource:
     poe_ninja_base_url = "https://poe.ninja"
     orbwatch_base_url = "https://orbwatch.trade"
+    poe2_dev_currency_url = "https://www.poe2.dev/calculators/currency"
 
     async def get_price(self, request: TrackingRequest) -> PriceSnapshotDTO | None:
         if request.item_type != "currency" or not request.league_name:
@@ -38,6 +41,13 @@ class CurrencyMarketSource:
         return await self._get_poe1_currency_price(request)
 
     async def _get_poe2_currency_price(self, request: TrackingRequest) -> PriceSnapshotDTO | None:
+        live_snapshot = await self._get_poe2_currency_price_from_orbwatch(request)
+        if live_snapshot is not None:
+            return live_snapshot
+
+        return await self._get_poe2_currency_price_from_poe2_dev(request)
+
+    async def _get_poe2_currency_price_from_orbwatch(self, request: TrackingRequest) -> PriceSnapshotDTO | None:
         try:
             async with httpx.AsyncClient(base_url=self.orbwatch_base_url, timeout=30.0) as client:
                 response = await client.get(
@@ -74,6 +84,40 @@ class CurrencyMarketSource:
             source="orbwatch.trade",
             observed_at=datetime.now(UTC),
             raw_payload=target_entry,
+        )
+
+    async def _get_poe2_currency_price_from_poe2_dev(self, request: TrackingRequest) -> PriceSnapshotDTO | None:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(self.poe2_dev_currency_url)
+                response.raise_for_status()
+                html = response.text
+        except httpx.HTTPError:
+            logger.exception("Failed to fetch POE2 fallback currency data for %s", request.league_name)
+            return None
+
+        values_by_name = self._extract_poe2_dev_chaos_values(html)
+        if not values_by_name:
+            return None
+
+        target_chaos = self._find_named_value(values_by_name, request.item_name)
+        exalted_chaos = self._find_named_value(values_by_name, "Exalted Orb")
+        if target_chaos is None or exalted_chaos in {None, Decimal("0")}:
+            return None
+
+        market_value = target_chaos / exalted_chaos
+        return PriceSnapshotDTO(
+            item_name=request.item_name,
+            market_value=market_value,
+            unit="ex",
+            league_name=request.league_name,
+            source="poe2.dev",
+            observed_at=datetime.now(UTC),
+            raw_payload={
+                "item_name": request.item_name,
+                "chaos_value": str(target_chaos),
+                "exalted_chaos_value": str(exalted_chaos),
+            },
         )
 
     async def _get_poe1_currency_price(self, request: TrackingRequest) -> PriceSnapshotDTO | None:
@@ -138,6 +182,35 @@ class CurrencyMarketSource:
         }
         aliases.update(alias_map.get(normalized, set()))
         return aliases
+
+    def _find_named_value(self, values_by_name: dict[str, Decimal], requested_name: str) -> Decimal | None:
+        requested_keys = self._candidate_keys(requested_name)
+        for entry_name, value in values_by_name.items():
+            if requested_keys & self._candidate_keys(entry_name):
+                return value
+        return None
+
+    def _extract_poe2_dev_chaos_values(self, html: str) -> dict[str, Decimal]:
+        text = self._html_to_text(html)
+        pattern = re.compile(
+            r"(?P<name>[A-Z][A-Za-z'0-9\- ]+?)\s+(?P<value>\d+(?:\.\d+)?)\s*c\b",
+            re.IGNORECASE,
+        )
+        values: dict[str, Decimal] = {}
+        for match in pattern.finditer(text):
+            name = " ".join(match.group("name").split())
+            value = self._extract_decimal(match.group("value"))
+            if name and value is not None:
+                values[name] = value
+        return values
+
+    @staticmethod
+    def _html_to_text(html: str) -> str:
+        without_scripts = re.sub(r"<script.*?>.*?</script>", " ", html, flags=re.IGNORECASE | re.DOTALL)
+        without_styles = re.sub(r"<style.*?>.*?</style>", " ", without_scripts, flags=re.IGNORECASE | re.DOTALL)
+        without_tags = re.sub(r"<[^>]+>", " ", without_styles)
+        normalized = re.sub(r"\s+", " ", unescape(without_tags))
+        return normalized
 
     @staticmethod
     def _normalize_name(value: str) -> str:
