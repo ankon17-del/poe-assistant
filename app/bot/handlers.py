@@ -12,6 +12,7 @@ from aiogram.types import CallbackQuery, Message
 from app.bot.dependencies import session_scope
 from app.bot.keyboards import (
     add_entry_keyboard,
+    currency_presets_keyboard,
     duplicate_resolution_keyboard,
     game_keyboard,
     league_keyboard,
@@ -504,9 +505,10 @@ async def add_choose_league(callback: CallbackQuery, state: FSMContext) -> None:
         chat_id=callback.message.chat.id,
         text=(
             f"Лига: {league.name}\n\n"
-            "Теперь пришли часть названия предмета или валюты. "
+            "Можно сразу выбрать частую валюту кнопкой ниже или прислать часть названия предмета/валюты. "
             "Я покажу варианты и буду обновлять это сообщение, чтобы не засорять чат."
         ),
+        reply_markup=currency_presets_keyboard(),
     )
     await callback.answer()
 
@@ -530,6 +532,34 @@ async def add_search_query(message: Message, state: FSMContext) -> None:
         text=f"Нашел варианты для: {query}\nВыбери готовый вариант или используй свой текст как есть.",
         reply_markup=search_results_keyboard(results, query),
     )
+
+
+@router.callback_query(F.data.startswith("add:preset_currency:"))
+async def add_choose_currency_preset(callback: CallbackQuery, state: FSMContext) -> None:
+    preset_key = callback.data.rsplit(":", 1)[1]
+    preset_map = {
+        "divine_orb": "Divine Orb",
+        "exalted_orb": "Exalted Orb",
+        "chaos_orb": "Chaos Orb",
+    }
+    item_name = preset_map.get(preset_key)
+    if not item_name:
+        await callback.answer("Не нашел такой пресет", show_alert=True)
+        return
+
+    await state.update_data(item_name=item_name, item_type="currency", trade_url=None)
+    await state.set_state(AddTrackingStates.choosing_currency)
+    await show_wizard_message(
+        state=state,
+        bot=callback.bot,
+        chat_id=callback.message.chat.id,
+        text=(
+            f"Выбран пресет: {item_name}\n\n"
+            "В какой валюте будем задавать порог?"
+        ),
+        reply_markup=threshold_currency_keyboard(),
+    )
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("add:item:"))

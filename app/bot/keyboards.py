@@ -69,6 +69,18 @@ def league_keyboard(leagues: list[League]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def currency_presets_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Divine Orb", callback_data="add:preset_currency:divine_orb")],
+            [InlineKeyboardButton(text="Exalted Orb", callback_data="add:preset_currency:exalted_orb")],
+            [InlineKeyboardButton(text="Chaos Orb", callback_data="add:preset_currency:chaos_orb")],
+            [InlineKeyboardButton(text="Назад", callback_data="add:back:league")],
+            [InlineKeyboardButton(text="Отмена", callback_data="add:cancel")],
+        ]
+    )
+
+
 def search_results_keyboard(results: list[str], query: str) -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(text=item_name, callback_data=f"add:item:{index}")]
