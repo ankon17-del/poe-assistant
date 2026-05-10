@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from html import unescape
 import re
@@ -224,21 +224,37 @@ class CurrencyMarketSource:
 
     async def _fetch_poe1_currency_overview(self, league_name: str) -> dict[str, Any]:
         async with httpx.AsyncClient(base_url=self.poe_ninja_base_url, timeout=30.0) as client:
-            response = await client.get(
-                "/api/data/currencyoverview",
-                params={"league": league_name, "type": "Currency"},
-            )
-            if response.status_code == 404:
+            candidate_params = [
+                {"league": league_name, "type": "Currency", "language": "en"},
+                {"league": league_name, "type": "Currency", "date": date.today().isoformat(), "language": "en"},
+                {
+                    "league": league_name,
+                    "type": "Currency",
+                    "date": (date.today() - timedelta(days=1)).isoformat(),
+                    "language": "en",
+                },
+            ]
+
+            last_response: httpx.Response | None = None
+            for params in candidate_params:
                 response = await client.get(
                     "/api/data/currencyoverview",
-                    params={
-                        "league": league_name,
-                        "type": "Currency",
-                        "date": date.today().isoformat(),
-                    },
+                    params=params,
                 )
-            response.raise_for_status()
-            return response.json()
+                last_response = response
+                if response.status_code >= 400:
+                    continue
+
+                payload = response.json()
+                lines = payload.get("lines", [])
+                if isinstance(lines, list) and lines:
+                    return payload
+
+            if last_response is None:
+                raise httpx.HTTPError("No response received from poe.ninja currency overview")
+
+            last_response.raise_for_status()
+            return last_response.json()
 
     async def _get_poe2_exchange_snapshot(self, league_name: str) -> ExchangeRateSnapshotDTO | None:
         try:
