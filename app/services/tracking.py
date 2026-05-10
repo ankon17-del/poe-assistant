@@ -28,6 +28,7 @@ class TrackingService:
         league = await LeagueService(self.session).get_or_create(league_name or self.settings.default_league_name)
         normalized_name = item_name.strip()
         normalized_trade_url = trade_url.strip() if trade_url else None
+        resolved_item_type = self._resolve_item_type(normalized_name, item_type)
 
         existing = await self.session.scalar(
             select(TrackedItem).where(
@@ -38,7 +39,7 @@ class TrackingService:
             )
         )
         if existing:
-            existing.item_type = item_type
+            existing.item_type = resolved_item_type
             existing.target_price = target_price
             existing.notify_enabled = True
             existing.is_active = True
@@ -48,7 +49,7 @@ class TrackingService:
             user_id=user.id,
             league_id=league.id,
             item_name=normalized_name,
-            item_type=item_type,
+            item_type=resolved_item_type,
             trade_url=normalized_trade_url,
             target_price=target_price,
         )
@@ -81,7 +82,7 @@ class TrackingService:
             .where(
                 TrackedItem.is_active.is_(True),
                 TrackedItem.notify_enabled.is_(True),
-                TrackedItem.trade_url.is_not(None),
+                TrackedItem.trade_url.is_not(None) | TrackedItem.target_price.is_not(None),
             )
             .options(selectinload(TrackedItem.user), selectinload(TrackedItem.league))
             .order_by(TrackedItem.id.asc())
@@ -98,7 +99,30 @@ class TrackingService:
         return TrackingRequest(
             tracked_item_id=tracked_item.id,
             item_name=tracked_item.item_name,
+            item_type=tracked_item.item_type,
             trade_url=tracked_item.trade_url,
+            target_price=tracked_item.target_price,
             league_name=league_name,
             game=game,
         )
+
+    @staticmethod
+    def _resolve_item_type(item_name: str, fallback_type: str) -> str:
+        if fallback_type != "item":
+            return fallback_type
+
+        normalized = "".join(ch for ch in item_name.lower() if ch.isalnum())
+        known_currency_keys = {
+            "divineorb",
+            "exaltedorb",
+            "chaosorb",
+            "regalorb",
+            "orbofalchemy",
+            "vaalorb",
+            "orbofannulment",
+            "orbofchance",
+            "orbofaugmentation",
+            "orboftransmutation",
+            "orbofalteration",
+        }
+        return "currency" if normalized in known_currency_keys else fallback_type

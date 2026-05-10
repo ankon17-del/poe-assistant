@@ -27,7 +27,9 @@ class SaleEventDTO:
 class TrackingRequest:
     tracked_item_id: int
     item_name: str
+    item_type: str
     trade_url: str | None
+    target_price: Decimal | None
     league_name: str | None
     game: str | None
 

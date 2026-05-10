@@ -14,3 +14,9 @@ class TelegramNotifier:
             await self.bot.send_message(chat_id=telegram_id, text=message)
         except Exception:
             logger.exception("Failed to send Telegram notification to %s", telegram_id)
+
+    async def send_price_alert(self, telegram_id: int, message: str) -> None:
+        try:
+            await self.bot.send_message(chat_id=telegram_id, text=message)
+        except Exception:
+            logger.exception("Failed to send price alert to %s", telegram_id)

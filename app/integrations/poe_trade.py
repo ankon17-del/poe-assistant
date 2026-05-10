@@ -8,7 +8,9 @@ class PoeTradeClient:
         request = TrackingRequest(
             tracked_item_id=0,
             item_name=item_name or "Unknown Item",
+            item_type="item",
             trade_url=trade_url,
+            target_price=None,
             league_name=None,
             game=None,
         )
