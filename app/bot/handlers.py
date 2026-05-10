@@ -93,6 +93,10 @@ def build_economy_text(summaries: list) -> str:
         else:
             lines.append("Курсы сейчас недоступны.")
 
+        if not snapshot and summary.game == "poe1" and summary.league_name.lower() != "standard":
+            lines.append("Для этой POE1-лиги отдельный источник курсов пока не ответил.")
+            lines.append("Я также попробовал fallback на Standard, но внешние данные не пришли.")
+
         if summary.active_watchers:
             lines.append(f"Активные currency alerts: {len(summary.active_watchers)}")
             for watcher in summary.active_watchers[:5]:

@@ -41,6 +41,7 @@ class CurrencyMarketSource:
     poe_watch_base_url = "https://api.poe.watch"
     orbwatch_base_url = "https://orbwatch.trade"
     poe2_dev_currency_url = "https://www.poe2.dev/calculators/currency"
+    _exchange_snapshot_cache: dict[tuple[str, str], ExchangeRateSnapshotDTO] = {}
 
     async def get_exchange_rates(self, league_name: str, game: str | None) -> dict[str, Decimal] | None:
         snapshot = await self.get_exchange_snapshot(league_name=league_name, game=game)
@@ -55,9 +56,16 @@ class CurrencyMarketSource:
             return None
 
         if game == "poe2":
-            return await self._get_poe2_exchange_snapshot(league_name)
+            snapshot = await self._get_poe2_exchange_snapshot(league_name)
+        else:
+            snapshot = await self._get_poe1_exchange_snapshot(league_name)
 
-        return await self._get_poe1_exchange_snapshot(league_name)
+        cache_key = ((game or "poe1"), league_name)
+        if snapshot is not None:
+            self._exchange_snapshot_cache[cache_key] = snapshot
+            return snapshot
+
+        return self._get_cached_exchange_snapshot(cache_key)
 
     async def get_price(self, request: TrackingRequest) -> PriceSnapshotDTO | None:
         if request.item_type != "currency" or not request.league_name:
@@ -399,6 +407,31 @@ class CurrencyMarketSource:
             rates=rates,
             observed_at=datetime.now(UTC),
         )
+
+    def _get_cached_exchange_snapshot(self, cache_key: tuple[str, str]) -> ExchangeRateSnapshotDTO | None:
+        snapshot = self._exchange_snapshot_cache.get(cache_key)
+        if snapshot is not None:
+            return ExchangeRateSnapshotDTO(
+                league_name=snapshot.league_name,
+                game=snapshot.game,
+                source=f"{snapshot.source} (cached)",
+                rates=snapshot.rates,
+                observed_at=snapshot.observed_at,
+            )
+
+        game, league_name = cache_key
+        if game == "poe1" and league_name.lower() != "standard":
+            standard_snapshot = self._exchange_snapshot_cache.get(("poe1", "Standard"))
+            if standard_snapshot is not None:
+                return ExchangeRateSnapshotDTO(
+                    league_name=league_name,
+                    game="poe1",
+                    source=f"{standard_snapshot.source} (Standard cached fallback)",
+                    rates=standard_snapshot.rates,
+                    observed_at=standard_snapshot.observed_at,
+                )
+
+        return None
 
     async def _fetch_poe_watch_currency_lines(
         self,
