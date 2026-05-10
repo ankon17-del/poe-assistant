@@ -37,6 +37,7 @@ class AddTrackingStates(StatesGroup):
     entering_search = State()
     choosing_currency = State()
     entering_trade_url = State()
+    entering_trade_name = State()
     entering_threshold = State()
     resolving_duplicate = State()
 
@@ -273,6 +274,21 @@ async def add_tracking(message: Message, state: FSMContext) -> None:
     target_price: Decimal | None = None
     target_currency = "ex"
 
+    if trade_url:
+        await state.clear()
+        await state.update_data(item_type="item", trade_url=trade_url, target_price=None, target_currency="ex")
+        await state.set_state(AddTrackingStates.entering_trade_name)
+        await show_wizard_message(
+            state=state,
+            bot=message.bot,
+            chat_id=message.chat.id,
+            text=(
+                "Ссылка получена.\n\n"
+                "Теперь пришли короткое название трекера (например: Mageblood, TS Bow, Mirror Ring)."
+            ),
+        )
+        return
+
     if "|" in payload and not trade_url:
         name_part, price_part = [part.strip() for part in payload.split("|", 1)]
         item_name = name_part
@@ -467,11 +483,23 @@ async def add_enter_threshold(message: Message, state: FSMContext) -> None:
     await state.update_data(target_price=str(amount))
     data = await state.get_data()
 
+    league_id = data.get("league_id")
+    if not league_id:
+        await finalize_tracking_creation(
+            state=state,
+            bot=message.bot,
+            chat_id=message.chat.id,
+            user_telegram_id=message.from_user.id,
+            username=message.from_user.username,
+            create_new=False,
+        )
+        return
+
     async with session_scope() as session:
         user = await ensure_user(session, message.from_user.id, message.from_user.username)
         similar_items = await TrackingService(session).find_similar_items(
             user=user,
-            league_id=data["league_id"],
+            league_id=league_id,
             item_name=data["item_name"],
             trade_url=data.get("trade_url"),
         )
@@ -504,14 +532,38 @@ async def add_enter_trade_url(message: Message, state: FSMContext) -> None:
         return
 
     await delete_if_possible(message)
-    await state.update_data(item_name="Trade URL", trade_url=trade_url, target_price=None, target_currency="ex")
-    await finalize_tracking_creation(
+    await state.update_data(trade_url=trade_url, item_type="item", target_price=None, target_currency="ex")
+    await state.set_state(AddTrackingStates.entering_trade_name)
+    await show_wizard_message(
         state=state,
         bot=message.bot,
         chat_id=message.chat.id,
-        user_telegram_id=message.from_user.id,
-        username=message.from_user.username,
-        create_new=False,
+        text=(
+            "Ссылка принята.\n\n"
+            "Теперь пришли название трекера (например: Mageblood)."
+        ),
+    )
+
+
+@router.message(AddTrackingStates.entering_trade_name)
+async def add_enter_trade_name(message: Message, state: FSMContext) -> None:
+    item_name = (message.text or "").strip()
+    if not item_name:
+        await message.answer("Нужен текст названия. Например: Mageblood")
+        return
+
+    await delete_if_possible(message)
+    await state.update_data(item_name=item_name, item_type="item")
+    await state.set_state(AddTrackingStates.choosing_currency)
+    await show_wizard_message(
+        state=state,
+        bot=message.bot,
+        chat_id=message.chat.id,
+        text=(
+            f"Название: {item_name}\n\n"
+            "В какой валюте задаем порог уведомления?"
+        ),
+        reply_markup=threshold_currency_keyboard(),
     )
 
 
