@@ -2,6 +2,8 @@
 
 Scalable MVP foundation for a Telegram assistant focused on Path of Exile and Path of Exile 2 trade tracking, sale notifications, basic stats, and reusable tracking templates.
 
+Current implementation status and next priorities are tracked in [ROADMAP_V2.md](/D:/!Work/CodexGames/POE AI/ROADMAP_V2.md).
+
 ## MVP Scope
 
 - Telegram bot with `/start`, `/help`, `/add`, `/remove`, `/list`, `/stats`, `/templates`, `/settings`.
