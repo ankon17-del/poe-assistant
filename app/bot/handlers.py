@@ -61,6 +61,10 @@ def build_tracking_lines(item) -> list[str]:
     lines = [f"#{item.id} - {item.item_name}", f"Игра: {game_label}", f"Лига: {league_name}"]
     if item.target_price is not None:
         lines.append(f"Порог: {format_decimal(Decimal(item.target_price))} {item.target_currency}")
+        status_label = "активен" if item.notify_enabled else "сработал, ждёт перезапуска"
+        lines.append(f"Статус: {status_label}")
+    elif item.trade_url:
+        lines.append("Статус: активен")
     if item.trade_url:
         lines.append("Источник: trade URL")
     return lines
