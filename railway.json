@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "uvicorn app.api.main:app --host 0.0.0.0 --port $PORT",
+    "startCommand": "sh -c 'if [ \"$SERVICE_MODE\" = \"bot\" ]; then python launcher.py; else uvicorn app.api.main:app --host 0.0.0.0 --port ${PORT:-8080}; fi'",
     "healthcheckPath": "/health",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 5
