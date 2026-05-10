@@ -29,6 +29,16 @@ def tracking_actions_keyboard(items: list[TrackedItem]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def paused_alerts_keyboard(items: list[TrackedItem]) -> InlineKeyboardMarkup:
+    rows = []
+    if items:
+        rows.append([InlineKeyboardButton(text="Перезапустить все", callback_data="alerts:reactivate_all")])
+    for item in items:
+        rows.append([InlineKeyboardButton(text=f"Перезапустить #{item.id}", callback_data=f"alerts:reactivate:{item.id}")])
+        rows.append([InlineKeyboardButton(text=f"Отключить #{item.id}", callback_data=f"alerts:remove:{item.id}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def add_entry_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[

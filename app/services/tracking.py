@@ -115,6 +115,20 @@ class TrackingService:
         )
         return list(result)
 
+    async def list_paused_price_alerts(self, user: User) -> list[TrackedItem]:
+        result = await self.session.scalars(
+            select(TrackedItem)
+            .where(
+                TrackedItem.user_id == user.id,
+                TrackedItem.is_active.is_(True),
+                TrackedItem.target_price.is_not(None),
+                TrackedItem.notify_enabled.is_(False),
+            )
+            .options(selectinload(TrackedItem.league))
+            .order_by(TrackedItem.created_at.desc())
+        )
+        return list(result)
+
     async def remove_item(self, user: User, tracked_item_id: int) -> bool:
         tracked_item = await self.session.scalar(
             select(TrackedItem).where(TrackedItem.id == tracked_item_id, TrackedItem.user_id == user.id)
@@ -140,6 +154,12 @@ class TrackingService:
 
         tracked_item.notify_enabled = True
         return True
+
+    async def reactivate_all_paused_price_alerts(self, user: User) -> int:
+        items = await self.list_paused_price_alerts(user)
+        for item in items:
+            item.notify_enabled = True
+        return len(items)
 
     async def list_items_for_polling(self) -> list[TrackedItem]:
         result = await self.session.scalars(

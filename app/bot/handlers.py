@@ -15,6 +15,7 @@ from app.bot.keyboards import (
     duplicate_resolution_keyboard,
     game_keyboard,
     league_keyboard,
+    paused_alerts_keyboard,
     search_results_keyboard,
     templates_keyboard,
     threshold_currency_keyboard,
@@ -74,6 +75,15 @@ def build_tracking_list_text(items: list) -> str:
     lines = [f"Активный трекинг: {len(items)}"]
     for item in items:
         lines.append("\n".join(build_tracking_lines(item)))
+    return "\n\n".join(lines)
+
+
+def build_paused_alerts_text(items: list) -> str:
+    lines = [f"Сработавшие alerts: {len(items)}"]
+    for item in items:
+        lines.append("\n".join(build_tracking_lines(item)))
+    lines.append("")
+    lines.append("Здесь можно быстро вернуть alert в работу или отключить его совсем.")
     return "\n\n".join(lines)
 
 
@@ -299,6 +309,7 @@ async def start(message: Message) -> None:
         "Быстрый старт:\n"
         "/add\n"
         "/list\n"
+        "/alerts\n"
         "/economy\n"
         "/templates\n\n"
         "Через /add можно выбрать игру, лигу, предмет и порог без ручного ввода длинной команды."
@@ -315,6 +326,7 @@ async def help_command(message: Message) -> None:
         "/add <trade_url>\n"
         "/remove <id> - отключить трекинг\n"
         "/list - список активного трекинга\n"
+        "/alerts - сработавшие price alerts и быстрый перезапуск\n"
         "/stats - статистика продаж\n"
         "/economy - курсы валют и активные currency alerts\n"
         "/templates - готовые наборы\n"
@@ -870,6 +882,89 @@ async def list_tracking(message: Message) -> None:
         lines.append("\n".join(build_tracking_lines(item)))
 
     await message.answer(build_tracking_list_text(items), reply_markup=tracking_actions_keyboard(items))
+
+
+@router.message(Command("alerts"))
+async def paused_alerts(message: Message) -> None:
+    async with session_scope() as session:
+        user = await ensure_user(session, message.from_user.id, message.from_user.username)
+        items = await TrackingService(session).list_paused_price_alerts(user)
+
+    if not items:
+        await message.answer("Сработавших price alerts пока нет. Когда alert сработает, он появится здесь.")
+        return
+
+    await message.answer(build_paused_alerts_text(items), reply_markup=paused_alerts_keyboard(items))
+
+
+@router.callback_query(F.data == "alerts:reactivate_all")
+async def reactivate_all_paused_alerts(callback: CallbackQuery) -> None:
+    async with session_scope() as session:
+        user = await ensure_user(session, callback.from_user.id, callback.from_user.username)
+        reactivated_count = await TrackingService(session).reactivate_all_paused_price_alerts(user)
+        items = await TrackingService(session).list_paused_price_alerts(user)
+
+    if reactivated_count == 0:
+        await callback.answer("Сработавших alerts для перезапуска нет", show_alert=True)
+        return
+
+    await callback.answer(f"Перезапустил alerts: {reactivated_count}")
+    if not callback.message:
+        return
+
+    if not items:
+        await callback.message.edit_text("Сработавших price alerts пока нет. Всё снова активно.")
+        return
+
+    await callback.message.edit_text(build_paused_alerts_text(items), reply_markup=paused_alerts_keyboard(items))
+
+
+@router.callback_query(F.data.startswith("alerts:reactivate:"))
+async def reactivate_paused_alert_from_panel(callback: CallbackQuery) -> None:
+    tracked_item_id = int(callback.data.rsplit(":", 1)[1])
+
+    async with session_scope() as session:
+        user = await ensure_user(session, callback.from_user.id, callback.from_user.username)
+        reactivated = await TrackingService(session).reactivate_item(user=user, tracked_item_id=tracked_item_id)
+        items = await TrackingService(session).list_paused_price_alerts(user)
+
+    if not reactivated:
+        await callback.answer("Этот alert уже активен, отключён или не найден", show_alert=True)
+        return
+
+    await callback.answer("Alert снова активен")
+    if not callback.message:
+        return
+
+    if not items:
+        await callback.message.edit_text("Сработавших price alerts пока нет. Всё снова активно.")
+        return
+
+    await callback.message.edit_text(build_paused_alerts_text(items), reply_markup=paused_alerts_keyboard(items))
+
+
+@router.callback_query(F.data.startswith("alerts:remove:"))
+async def remove_paused_alert_from_panel(callback: CallbackQuery) -> None:
+    tracked_item_id = int(callback.data.rsplit(":", 1)[1])
+
+    async with session_scope() as session:
+        user = await ensure_user(session, callback.from_user.id, callback.from_user.username)
+        removed = await TrackingService(session).remove_item(user=user, tracked_item_id=tracked_item_id)
+        items = await TrackingService(session).list_paused_price_alerts(user)
+
+    if not removed:
+        await callback.answer("Этот alert уже отключён или не найден", show_alert=True)
+        return
+
+    await callback.answer("Alert отключён")
+    if not callback.message:
+        return
+
+    if not items:
+        await callback.message.edit_text("Сработавших price alerts пока нет.")
+        return
+
+    await callback.message.edit_text(build_paused_alerts_text(items), reply_markup=paused_alerts_keyboard(items))
 
 
 @router.message(Command("stats"))
