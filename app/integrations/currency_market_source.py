@@ -20,6 +20,7 @@ class PriceSnapshotDTO:
     item_name: str
     market_value: Decimal
     unit: str
+    quote_values: dict[str, Decimal]
     league_name: str | None
     source: str
     observed_at: datetime
@@ -80,6 +81,7 @@ class CurrencyMarketSource:
             item_name=request.item_name,
             market_value=market_value,
             unit="ex",
+            quote_values=self._build_quote_values_from_orbwatch(currencies, target_entry, market_value),
             league_name=request.league_name,
             source="orbwatch.trade",
             observed_at=datetime.now(UTC),
@@ -106,10 +108,16 @@ class CurrencyMarketSource:
             return None
 
         market_value = target_chaos / exalted_chaos
+        divine_chaos = self._find_named_value(values_by_name, "Divine Orb")
         return PriceSnapshotDTO(
             item_name=request.item_name,
             market_value=market_value,
             unit="ex",
+            quote_values=self._build_quote_values_from_chaos(
+                target_chaos=target_chaos,
+                exalted_chaos=exalted_chaos,
+                divine_chaos=divine_chaos,
+            ),
             league_name=request.league_name,
             source="poe2.dev",
             observed_at=datetime.now(UTC),
@@ -149,10 +157,20 @@ class CurrencyMarketSource:
         if market_value is None:
             return None
 
+        divine_entry = self._find_currency_entry(lines, "Divine Orb")
+        exalted_entry = self._find_currency_entry(lines, "Exalted Orb")
+        divine_chaos = self._extract_decimal(divine_entry.get("chaosEquivalent")) if divine_entry else None
+        exalted_chaos = self._extract_decimal(exalted_entry.get("chaosEquivalent")) if exalted_entry else None
+
         return PriceSnapshotDTO(
             item_name=request.item_name,
             market_value=market_value,
             unit="chaos",
+            quote_values=self._build_quote_values_from_chaos(
+                target_chaos=market_value,
+                exalted_chaos=exalted_chaos,
+                divine_chaos=divine_chaos,
+            ),
             league_name=request.league_name,
             source="poe.ninja",
             observed_at=datetime.now(UTC),
@@ -238,6 +256,43 @@ class CurrencyMarketSource:
             return nested_numeric
 
         return None
+
+    def _build_quote_values_from_orbwatch(
+        self,
+        currencies: list[dict[str, Any]],
+        target_entry: dict[str, Any],
+        ex_value: Decimal,
+    ) -> dict[str, Decimal]:
+        quote_values = {"ex": ex_value}
+        exalted_entry = self._find_currency_entry(currencies, "Exalted Orb")
+        divine_entry = self._find_currency_entry(currencies, "Divine Orb")
+        chaos_entry = self._find_currency_entry(currencies, "Chaos Orb")
+
+        target_market = self._extract_decimal(target_entry.get("market"))
+        exalted_market = self._extract_decimal(exalted_entry.get("market")) if exalted_entry else None
+        divine_market = self._extract_decimal(divine_entry.get("market")) if divine_entry else None
+        chaos_market = self._extract_decimal(chaos_entry.get("market")) if chaos_entry else None
+
+        if target_market is not None and exalted_market not in {None, Decimal("0")}:
+            quote_values["ex"] = target_market / exalted_market
+        if target_market is not None and divine_market not in {None, Decimal("0")}:
+            quote_values["div"] = target_market / divine_market
+        if target_market is not None and chaos_market not in {None, Decimal("0")}:
+            quote_values["chaos"] = target_market / chaos_market
+        return quote_values
+
+    @staticmethod
+    def _build_quote_values_from_chaos(
+        target_chaos: Decimal,
+        exalted_chaos: Decimal | None,
+        divine_chaos: Decimal | None,
+    ) -> dict[str, Decimal]:
+        quote_values = {"chaos": target_chaos}
+        if exalted_chaos not in {None, Decimal("0")}:
+            quote_values["ex"] = target_chaos / exalted_chaos
+        if divine_chaos not in {None, Decimal("0")}:
+            quote_values["div"] = target_chaos / divine_chaos
+        return quote_values
 
     def _find_first_numeric(self, payload: Any, preferred_keys: set[str]) -> Decimal | None:
         if isinstance(payload, dict):

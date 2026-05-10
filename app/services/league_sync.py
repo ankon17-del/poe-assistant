@@ -18,6 +18,7 @@ class LeagueSyncService:
         for league_data in leagues_payload:
             league = await league_service.upsert(
                 name=league_data["name"],
+                realm=realm,
                 is_active=not bool(league_data.get("endAt")),
             )
             synced.append(league)

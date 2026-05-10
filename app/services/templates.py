@@ -64,6 +64,7 @@ class TemplateService:
                 item_name=item.item_name,
                 item_type=item.item_type,
                 target_price=threshold,
+                target_currency="ex",
             )
 
         after_count = await self.session.scalar(

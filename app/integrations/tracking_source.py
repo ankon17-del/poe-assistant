@@ -30,6 +30,7 @@ class TrackingRequest:
     item_type: str
     trade_url: str | None
     target_price: Decimal | None
+    target_currency: str | None
     league_name: str | None
     game: str | None
 

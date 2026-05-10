@@ -18,12 +18,11 @@ async def main() -> None:
             access_token = ""
 
         async with async_session_factory() as session:
-            leagues = await LeagueSyncService(
-                session,
-                PoeApiClient(access_token=access_token or None),
-            ).sync_active_leagues(realm="poe2")
+            client = PoeApiClient(access_token=access_token or None)
+            poe2_leagues = await LeagueSyncService(session, client).sync_active_leagues(realm="poe2")
+            poe1_leagues = await LeagueSyncService(session, client).sync_active_leagues(realm="poe1")
             await session.commit()
-            print(f"synced {len(leagues)} leagues")
+            print(f"synced {len(poe2_leagues)} poe2 leagues and {len(poe1_leagues)} poe1 leagues")
     except PoeApiAuthError as exc:
         print(str(exc))
 

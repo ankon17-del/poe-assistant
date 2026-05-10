@@ -28,14 +28,19 @@ class PriceAlertService:
             return PriceAlertResult(triggered=False)
 
         target_price = Decimal(tracked_item.target_price)
-        current_value = Decimal(snapshot.market_value)
+        target_currency = (tracked_item.target_currency or snapshot.unit).lower()
+        current_value = snapshot.quote_values.get(target_currency)
+        if current_value is None and target_currency == snapshot.unit:
+            current_value = Decimal(snapshot.market_value)
+        if current_value is None:
+            return PriceAlertResult(triggered=False)
         if current_value < target_price:
             return PriceAlertResult(triggered=False)
 
         message = (
-            f"Price alert: {snapshot.item_name} reached {self._format_decimal(current_value)} {snapshot.unit} "
+            f"Price alert: {snapshot.item_name} reached {self._format_decimal(current_value)} {target_currency} "
             f"in {snapshot.league_name or 'unknown league'} "
-            f"(target {self._format_decimal(target_price)} {snapshot.unit})."
+            f"(target {self._format_decimal(target_price)} {target_currency})."
         )
 
         await NotificationService(self.session).record(
