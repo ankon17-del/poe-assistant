@@ -38,6 +38,7 @@ class ExchangeRateSnapshotDTO:
 
 class CurrencyMarketSource:
     poe_ninja_base_url = "https://poe.ninja"
+    poe_watch_base_url = "https://api.poe.watch"
     orbwatch_base_url = "https://orbwatch.trade"
     poe2_dev_currency_url = "https://www.poe2.dev/calculators/currency"
 
@@ -158,20 +159,34 @@ class CurrencyMarketSource:
         try:
             payload = await self._fetch_poe1_currency_overview(request.league_name)
         except (httpx.HTTPError, ValueError):
-            logger.exception("Failed to fetch POE1 currency market data for %s", request.league_name)
-            return None
+            logger.warning("Primary POE1 currency source unavailable for %s, trying poe.watch", request.league_name)
+            return await self._get_poe1_currency_price_from_poe_watch(request)
 
         lines = payload.get("lines", [])
         if not isinstance(lines, list) or not lines:
-            return None
+            logger.warning(
+                "Primary POE1 currency source returned no lines for %s, trying poe.watch",
+                request.league_name,
+            )
+            return await self._get_poe1_currency_price_from_poe_watch(request)
 
         target_entry = self._find_currency_entry(lines, request.item_name)
         if not target_entry:
-            return None
+            logger.warning(
+                "Primary POE1 currency source could not match %s in %s, trying poe.watch",
+                request.item_name,
+                request.league_name,
+            )
+            return await self._get_poe1_currency_price_from_poe_watch(request)
 
         market_value = self._extract_decimal(target_entry.get("chaosEquivalent"))
         if market_value is None:
-            return None
+            logger.warning(
+                "Primary POE1 currency source returned no chaosEquivalent for %s in %s, trying poe.watch",
+                request.item_name,
+                request.league_name,
+            )
+            return await self._get_poe1_currency_price_from_poe_watch(request)
 
         divine_entry = self._find_currency_entry(lines, "Divine Orb")
         exalted_entry = self._find_currency_entry(lines, "Exalted Orb")
@@ -197,12 +212,16 @@ class CurrencyMarketSource:
         try:
             payload = await self._fetch_poe1_currency_overview(league_name)
         except (httpx.HTTPError, ValueError):
-            logger.warning("POE1 exchange rates unavailable for %s", league_name)
-            return None
+            logger.warning("Primary POE1 exchange rates unavailable for %s, trying poe.watch", league_name)
+            return await self._get_poe1_exchange_snapshot_from_poe_watch(league_name)
 
         lines = payload.get("lines", [])
         if not isinstance(lines, list) or not lines:
-            return None
+            logger.warning(
+                "Primary POE1 exchange source returned no lines for %s, trying poe.watch",
+                league_name,
+            )
+            return await self._get_poe1_exchange_snapshot_from_poe_watch(league_name)
 
         divine_entry = self._find_currency_entry(lines, "Divine Orb")
         exalted_entry = self._find_currency_entry(lines, "Exalted Orb")
@@ -214,10 +233,87 @@ class CurrencyMarketSource:
             rates["ex"] = exalted_chaos
         if divine_chaos not in {None, Decimal("0")}:
             rates["div"] = divine_chaos
+        if len(rates) == 1:
+            logger.warning(
+                "Primary POE1 exchange source returned no divine/exalted rates for %s, trying poe.watch",
+                league_name,
+            )
+            return await self._get_poe1_exchange_snapshot_from_poe_watch(league_name)
         return ExchangeRateSnapshotDTO(
             league_name=league_name,
             game="poe1",
             source="poe.ninja",
+            rates=rates,
+            observed_at=datetime.now(UTC),
+        )
+
+    async def _get_poe1_currency_price_from_poe_watch(self, request: TrackingRequest) -> PriceSnapshotDTO | None:
+        try:
+            lines = await self._fetch_poe_watch_currency_lines(request.league_name, [request.item_name, "Divine Orb", "Exalted Orb"])
+        except (httpx.HTTPError, ValueError):
+            logger.exception("Failed to fetch POE1 currency fallback data from poe.watch for %s", request.league_name)
+            return None
+
+        target_entry = lines.get(request.item_name.lower())
+        if not target_entry:
+            return None
+
+        market_value = self._extract_decimal(target_entry.get("mean")) or self._extract_decimal(target_entry.get("median"))
+        if market_value is None:
+            return None
+
+        divine_entry = lines.get("divine orb")
+        exalted_entry = lines.get("exalted orb")
+        divine_chaos = None
+        exalted_chaos = None
+        if divine_entry:
+            divine_chaos = self._extract_decimal(divine_entry.get("mean")) or self._extract_decimal(divine_entry.get("median"))
+        if exalted_entry:
+            exalted_chaos = self._extract_decimal(exalted_entry.get("mean")) or self._extract_decimal(exalted_entry.get("median"))
+
+        return PriceSnapshotDTO(
+            item_name=request.item_name,
+            market_value=market_value,
+            unit="chaos",
+            quote_values=self._build_quote_values_from_chaos(
+                target_chaos=market_value,
+                exalted_chaos=exalted_chaos,
+                divine_chaos=divine_chaos,
+            ),
+            league_name=request.league_name,
+            source="poe.watch",
+            observed_at=datetime.now(UTC),
+            raw_payload=target_entry,
+        )
+
+    async def _get_poe1_exchange_snapshot_from_poe_watch(self, league_name: str) -> ExchangeRateSnapshotDTO | None:
+        try:
+            lines = await self._fetch_poe_watch_currency_lines(league_name, ["Divine Orb", "Exalted Orb"])
+        except (httpx.HTTPError, ValueError):
+            logger.warning("POE1 exchange rate fallback unavailable for %s", league_name)
+            return None
+
+        divine_entry = lines.get("divine orb")
+        exalted_entry = lines.get("exalted orb")
+        divine_chaos = None
+        exalted_chaos = None
+        if divine_entry:
+            divine_chaos = self._extract_decimal(divine_entry.get("mean")) or self._extract_decimal(divine_entry.get("median"))
+        if exalted_entry:
+            exalted_chaos = self._extract_decimal(exalted_entry.get("mean")) or self._extract_decimal(exalted_entry.get("median"))
+
+        rates = {"chaos": Decimal("1")}
+        if exalted_chaos not in {None, Decimal("0")}:
+            rates["ex"] = exalted_chaos
+        if divine_chaos not in {None, Decimal("0")}:
+            rates["div"] = divine_chaos
+        if len(rates) == 1:
+            return None
+
+        return ExchangeRateSnapshotDTO(
+            league_name=league_name,
+            game="poe1",
+            source="poe.watch",
             rates=rates,
             observed_at=datetime.now(UTC),
         )
@@ -284,6 +380,55 @@ class CurrencyMarketSource:
             rates=rates,
             observed_at=datetime.now(UTC),
         )
+
+    async def _fetch_poe_watch_currency_lines(
+        self,
+        league_name: str,
+        item_names: list[str],
+    ) -> dict[str, dict[str, Any]]:
+        async with httpx.AsyncClient(base_url=self.poe_watch_base_url, timeout=30.0) as client:
+            itemdata_response = await client.get("/itemdata")
+            itemdata_response.raise_for_status()
+            itemdata = itemdata_response.json()
+
+            wanted = {name.lower() for name in item_names}
+            items_by_name = {
+                str(entry.get("name", "")).lower(): entry
+                for entry in itemdata
+                if isinstance(entry, dict)
+                and str(entry.get("name", "")).lower() in wanted
+            }
+
+            results: dict[str, dict[str, Any]] = {}
+            for item_name in wanted:
+                item_entry = items_by_name.get(item_name)
+                if not item_entry:
+                    continue
+
+                item_id = item_entry.get("id")
+                if item_id is None:
+                    continue
+
+                item_response = await client.get("/item", params={"id": item_id})
+                item_response.raise_for_status()
+                payload = item_response.json()
+                leagues = payload.get("leagues", [])
+                if not isinstance(leagues, list):
+                    continue
+
+                match = next(
+                    (
+                        league_entry
+                        for league_entry in leagues
+                        if isinstance(league_entry, dict)
+                        and str(league_entry.get("name", "")).lower() == league_name.lower()
+                    ),
+                    None,
+                )
+                if match:
+                    results[item_name] = match
+
+            return results
 
     def _find_currency_entry(self, entries: list[dict[str, Any]], requested_name: str) -> dict[str, Any] | None:
         requested_keys = self._candidate_keys(requested_name)
