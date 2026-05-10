@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.currency_market_source import PriceSnapshotDTO
@@ -80,6 +81,7 @@ class PriceAlertService:
             await self.notifier.send_price_alert(
                 telegram_id=tracked_item.user.telegram_id,
                 message=message,
+                reply_markup=self._price_alert_actions_keyboard(tracked_item.id),
             )
 
         tracked_item.notify_enabled = False
@@ -97,3 +99,22 @@ class PriceAlertService:
     def _format_decimal(value: Decimal) -> str:
         normalized = value.normalize()
         return format(normalized, "f").rstrip("0").rstrip(".") or "0"
+
+    @staticmethod
+    def _price_alert_actions_keyboard(tracked_item_id: int) -> InlineKeyboardMarkup:
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=f"Перезапустить #{tracked_item_id}",
+                        callback_data=f"tracking:reactivate:{tracked_item_id}",
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=f"Отключить #{tracked_item_id}",
+                        callback_data=f"tracking:remove:{tracked_item_id}",
+                    )
+                ],
+            ]
+        )

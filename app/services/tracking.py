@@ -125,6 +125,22 @@ class TrackingService:
         tracked_item.is_active = False
         return True
 
+    async def reactivate_item(self, user: User, tracked_item_id: int) -> bool:
+        tracked_item = await self.session.scalar(
+            select(TrackedItem).where(TrackedItem.id == tracked_item_id, TrackedItem.user_id == user.id)
+        )
+        if not tracked_item or not tracked_item.is_active:
+            return False
+
+        if tracked_item.target_price is None:
+            return False
+
+        if tracked_item.notify_enabled:
+            return False
+
+        tracked_item.notify_enabled = True
+        return True
+
     async def list_items_for_polling(self) -> list[TrackedItem]:
         result = await self.session.scalars(
             select(TrackedItem)

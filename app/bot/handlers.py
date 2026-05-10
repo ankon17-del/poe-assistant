@@ -798,6 +798,29 @@ async def remove_tracking_from_list_v2(callback: CallbackQuery) -> None:
     )
 
 
+@router.callback_query(F.data.startswith("list2:reactivate:"))
+async def reactivate_tracking_from_list_v2(callback: CallbackQuery) -> None:
+    tracked_item_id = int(callback.data.rsplit(":", 1)[1])
+
+    async with session_scope() as session:
+        user = await ensure_user(session, callback.from_user.id, callback.from_user.username)
+        reactivated = await TrackingService(session).reactivate_item(user=user, tracked_item_id=tracked_item_id)
+        items = await TrackingService(session).list_items(user)
+
+    if not reactivated:
+        await callback.answer("Трекер уже активен, отключён или не найден", show_alert=True)
+        return
+
+    await callback.answer("Трекер снова активен")
+    if not callback.message:
+        return
+
+    await callback.message.edit_text(
+        build_tracking_list_text(items),
+        reply_markup=tracking_actions_keyboard(items),
+    )
+
+
 @router.callback_query(F.data.startswith("tracking:remove:"))
 async def remove_tracking_callback(callback: CallbackQuery) -> None:
     tracked_item_id = int(callback.data.rsplit(":", 1)[1])
@@ -807,11 +830,29 @@ async def remove_tracking_callback(callback: CallbackQuery) -> None:
         removed = await TrackingService(session).remove_item(user=user, tracked_item_id=tracked_item_id)
 
     if not removed:
-        await callback.answer("Трекинг отключен")
-        if callback.message:
-            await callback.message.edit_reply_markup(reply_markup=None)
-    else:
-        await callback.answer("Трекинг уже отключен или не найден", show_alert=True)
+        await callback.answer("Трекер уже отключён или не найден", show_alert=True)
+        return
+
+    await callback.answer("Трекер отключён")
+    if callback.message:
+        await callback.message.edit_reply_markup(reply_markup=None)
+
+
+@router.callback_query(F.data.startswith("tracking:reactivate:"))
+async def reactivate_tracking_callback(callback: CallbackQuery) -> None:
+    tracked_item_id = int(callback.data.rsplit(":", 1)[1])
+
+    async with session_scope() as session:
+        user = await ensure_user(session, callback.from_user.id, callback.from_user.username)
+        reactivated = await TrackingService(session).reactivate_item(user=user, tracked_item_id=tracked_item_id)
+
+    if not reactivated:
+        await callback.answer("Трекер уже активен, отключён или не найден", show_alert=True)
+        return
+
+    await callback.answer("Трекер снова активен")
+    if callback.message:
+        await callback.message.edit_reply_markup(reply_markup=None)
 
 
 @router.message(Command("list"))

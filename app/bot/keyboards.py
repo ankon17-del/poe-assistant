@@ -23,6 +23,8 @@ def templates_keyboard(templates: list[TemplateGroup]) -> InlineKeyboardMarkup:
 def tracking_actions_keyboard(items: list[TrackedItem]) -> InlineKeyboardMarkup:
     rows = []
     for item in items:
+        if item.target_price is not None and not item.notify_enabled:
+            rows.append([InlineKeyboardButton(text=f"Перезапустить #{item.id}", callback_data=f"list2:reactivate:{item.id}")])
         rows.append([InlineKeyboardButton(text=f"Отключить #{item.id}", callback_data=f"list2:remove:{item.id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
