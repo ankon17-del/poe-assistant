@@ -61,6 +61,16 @@ python -m scripts.run_tracking_worker
 uvicorn app.api.main:app --reload
 ```
 
+## Railway Service Modes
+
+`railway.json` supports three runtime modes through the `SERVICE_MODE` environment variable:
+
+- unset or `web` -> run FastAPI via `uvicorn`
+- `bot` -> run the Telegram polling bot
+- `worker` -> run the background tracking worker
+
+Both the bot and worker expose `/health` on `PORT` so Railway healthchecks can succeed without a public HTTP app.
+
 ## Railway API Deploy
 
 This repo includes a minimal `railway.json` deployment config for the FastAPI service.
@@ -69,6 +79,8 @@ Recommended production split:
 
 - `poeassistant.ru` -> Tilda
 - `api.poeassistant.ru` -> Railway FastAPI service
+- `poe-assistant-bot` -> Railway service with `SERVICE_MODE=bot`
+- `poe-assistant-worker` -> Railway service with `SERVICE_MODE=worker`
 
 Suggested first deploy flow:
 
