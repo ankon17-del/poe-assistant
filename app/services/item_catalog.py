@@ -37,11 +37,13 @@ class ItemCatalogService:
         tracked_names = await self.session.scalars(select(TrackedItem.item_name).distinct())
         all_names = self._dedupe_names([*COMMON_CURRENCIES, *template_names, *tracked_names])
 
-        ranked = sorted(
-            all_names,
-            key=lambda name: self._sort_key(name=name, query=normalized_query),
-        )
-        filtered = [name for name in ranked if normalized_query in name.lower()]
+        query_tokens = [token for token in normalized_query.split() if token]
+        ranked = sorted(all_names, key=lambda name: self._sort_key(name=name, query=normalized_query))
+        filtered = [
+            name
+            for name in ranked
+            if self._matches_query(name=name, raw_query=normalized_query, query_tokens=query_tokens)
+        ]
         return filtered[:limit]
 
     @staticmethod
@@ -62,7 +64,22 @@ class ItemCatalogService:
     @staticmethod
     def _sort_key(name: str, query: str) -> tuple[int, int, str]:
         lowered = name.lower()
+        exact = 0 if lowered == query else 1
         starts = 0 if lowered.startswith(query) else 1
-        contains_index = lowered.find(query)
+        word_starts = 0 if any(part.startswith(query) for part in lowered.replace("-", " ").split()) else 1
+        contains_index = lowered.find(query) if query else 9999
         position = contains_index if contains_index >= 0 else 9999
-        return (starts, position, name)
+        return (exact, starts, word_starts, position, len(name), name)
+
+    @staticmethod
+    def _matches_query(name: str, raw_query: str, query_tokens: list[str]) -> bool:
+        lowered = name.lower()
+        if raw_query and raw_query in lowered:
+            return True
+        if not query_tokens:
+            return False
+        normalized_words = lowered.replace("-", " ").split()
+        return all(
+            any(token in word or word.startswith(token) for word in normalized_words)
+            for token in query_tokens
+        )

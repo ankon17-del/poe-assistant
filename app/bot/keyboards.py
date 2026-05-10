@@ -23,7 +23,7 @@ def templates_keyboard(templates: list[TemplateGroup]) -> InlineKeyboardMarkup:
 def tracking_actions_keyboard(items: list[TrackedItem]) -> InlineKeyboardMarkup:
     rows = []
     for item in items:
-        rows.append([InlineKeyboardButton(text=f"Отключить #{item.id}", callback_data=f"tracking:remove:{item.id}")])
+        rows.append([InlineKeyboardButton(text=f"Отключить #{item.id}", callback_data=f"list:remove:{item.id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 

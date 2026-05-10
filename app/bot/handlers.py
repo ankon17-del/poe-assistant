@@ -46,8 +46,10 @@ async def ensure_user(session, telegram_id: int, username: str | None):
 
 
 def format_decimal(value: Decimal) -> str:
-    normalized = value.normalize() if value == value.to_integral() else value.normalize()
-    return format(normalized, "f").rstrip("0").rstrip(".") or "0"
+    text = format(value.normalize(), "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
 
 
 def build_tracking_lines(item) -> list[str]:
@@ -59,6 +61,13 @@ def build_tracking_lines(item) -> list[str]:
     if item.trade_url:
         lines.append("Источник: trade URL")
     return lines
+
+
+def build_tracking_list_text(items: list) -> str:
+    lines = [f"Активный трекинг: {len(items)}"]
+    for item in items:
+        lines.append("\n".join(build_tracking_lines(item)))
+    return "\n\n".join(lines)
 
 
 def normalize_threshold_currency(raw_value: str) -> str:
@@ -277,6 +286,16 @@ async def add_tracking(message: Message, state: FSMContext) -> None:
                 "/add Divine Orb | 0.5 div"
             )
             return
+    elif not trade_url:
+        await message.answer(
+            "Для команды в одну строку нужен порог цены.\n\n"
+            "Примеры:\n"
+            "/add Divine Orb | 1\n"
+            "/add Divine Orb | 150 chaos\n"
+            "/add Divine Orb | 0.5 div\n\n"
+            "Либо используй просто /add — там мастер с выбором и поиском."
+        )
+        return
 
     async with session_scope() as session:
         user = await ensure_user(session, message.from_user.id, message.from_user.username)
@@ -596,6 +615,33 @@ async def remove_tracking(message: Message) -> None:
     await message.answer("Трекинг отключен." if removed else "Не нашел такой активный трекинг.")
 
 
+@router.callback_query(F.data.startswith("list:remove:"))
+async def remove_tracking_from_list(callback: CallbackQuery) -> None:
+    tracked_item_id = int(callback.data.rsplit(":", 1)[1])
+
+    async with session_scope() as session:
+        user = await ensure_user(session, callback.from_user.id, callback.from_user.username)
+        removed = await TrackingService(session).remove_item(user=user, tracked_item_id=tracked_item_id)
+        items = await TrackingService(session).list_items(user)
+
+    if removed:
+        await callback.answer("Трекинг уже отключен или не найден", show_alert=True)
+        return
+
+    await callback.answer("Трекинг отключен")
+    if not callback.message:
+        return
+
+    if not items:
+        await callback.message.edit_text("Активного трекинга пока нет. Добавь предмет через /add.")
+        return
+
+    await callback.message.edit_text(
+        build_tracking_list_text(items),
+        reply_markup=tracking_actions_keyboard(items),
+    )
+
+
 @router.callback_query(F.data.startswith("tracking:remove:"))
 async def remove_tracking_callback(callback: CallbackQuery) -> None:
     tracked_item_id = int(callback.data.rsplit(":", 1)[1])
@@ -604,7 +650,7 @@ async def remove_tracking_callback(callback: CallbackQuery) -> None:
         user = await ensure_user(session, callback.from_user.id, callback.from_user.username)
         removed = await TrackingService(session).remove_item(user=user, tracked_item_id=tracked_item_id)
 
-    if removed:
+    if not removed:
         await callback.answer("Трекинг отключен")
         if callback.message:
             await callback.message.edit_reply_markup(reply_markup=None)
@@ -626,7 +672,7 @@ async def list_tracking(message: Message) -> None:
     for item in items:
         lines.append("\n".join(build_tracking_lines(item)))
 
-    await message.answer("\n\n".join(lines), reply_markup=tracking_actions_keyboard(items))
+    await message.answer(build_tracking_list_text(items), reply_markup=tracking_actions_keyboard(items))
 
 
 @router.message(Command("stats"))
