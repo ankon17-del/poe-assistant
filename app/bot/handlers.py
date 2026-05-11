@@ -186,6 +186,28 @@ def build_economy_text(summaries: list, overview) -> str:
     lines.append("")
     lines.append(f"Активные currency alerts: {overview.total_active_currency_alerts}")
     lines.append(f"Сработавшие alerts на паузе: {overview.total_paused_currency_alerts}")
+    if overview.market_pulse:
+        lines.append("Market pulse:")
+        if overview.market_pulse.hottest_movement:
+            movement = overview.market_pulse.hottest_movement
+            game_label = "POE 2" if movement.game == "poe2" else "POE 1"
+            currency_label = "Divine Orb" if movement.currency_code == "div" else "Exalted Orb"
+            direction = "растёт" if movement.delta_value > 0 else "снижается"
+            delta_percent = movement.delta_ratio.copy_abs() * Decimal("100")
+            lines.append(
+                f"- Самое сильное движение: {currency_label} [{game_label} / {movement.league_name}] "
+                f"{direction} на {format_decimal(delta_percent)}%"
+            )
+        if overview.market_pulse.hottest_alert:
+            alert = overview.market_pulse.hottest_alert
+            game_label = "POE 2" if alert.game == "poe2" else "POE 1"
+            progress_percent = min(alert.progress_ratio * Decimal("100"), Decimal("999"))
+            lines.append(
+                f"- Самый горячий alert: #{alert.tracked_item_id} {alert.item_name} "
+                f"[{game_label} / {alert.league_name}] — {format_decimal(progress_percent)}% до срабатывания"
+            )
+        if overview.market_pulse.total_moving_markets:
+            lines.append(f"- Двигающихся market-срезов: {overview.market_pulse.total_moving_markets}")
     if overview.top_watched_currencies:
         lines.append("Топ отслеживаемых валют:")
         for entry in overview.top_watched_currencies:

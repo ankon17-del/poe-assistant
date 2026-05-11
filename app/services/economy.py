@@ -51,6 +51,7 @@ class EconomyOverviewSummary:
     top_watched_currencies: list[TopWatchedCurrencySummary]
     nearest_alerts: list["NearestCurrencyAlertSummary"]
     market_movements: list["MarketMovementSummary"]
+    market_pulse: "MarketPulseSummary | None"
 
 
 @dataclass(frozen=True)
@@ -74,6 +75,13 @@ class MarketMovementSummary:
     previous_value: Decimal
     delta_value: Decimal
     delta_ratio: Decimal
+
+
+@dataclass(frozen=True)
+class MarketPulseSummary:
+    hottest_movement: MarketMovementSummary | None
+    hottest_alert: NearestCurrencyAlertSummary | None
+    total_moving_markets: int
 
 
 class EconomyService:
@@ -164,12 +172,19 @@ class EconomyService:
             )[:5]
         ]
 
+        nearest_alerts = self._build_nearest_alerts(summaries)
+        market_movements = self._build_market_movements(summaries)
+
         overview = EconomyOverviewSummary(
             total_active_currency_alerts=len(active_items),
             total_paused_currency_alerts=len(paused_items),
             top_watched_currencies=top_watched,
-            nearest_alerts=self._build_nearest_alerts(summaries),
-            market_movements=self._build_market_movements(summaries),
+            nearest_alerts=nearest_alerts,
+            market_movements=market_movements,
+            market_pulse=self._build_market_pulse(
+                nearest_alerts=nearest_alerts,
+                market_movements=market_movements,
+            ),
         )
         return summaries, overview
 
@@ -242,6 +257,22 @@ class EconomyService:
 
         movements.sort(key=lambda item: abs(item.delta_ratio), reverse=True)
         return movements[:6]
+
+    @staticmethod
+    def _build_market_pulse(
+        *,
+        nearest_alerts: list[NearestCurrencyAlertSummary],
+        market_movements: list[MarketMovementSummary],
+    ) -> MarketPulseSummary | None:
+        hottest_movement = market_movements[0] if market_movements else None
+        hottest_alert = nearest_alerts[0] if nearest_alerts else None
+        if hottest_movement is None and hottest_alert is None:
+            return None
+        return MarketPulseSummary(
+            hottest_movement=hottest_movement,
+            hottest_alert=hottest_alert,
+            total_moving_markets=len(market_movements),
+        )
 
     @staticmethod
     def _resolve_currency_value(
