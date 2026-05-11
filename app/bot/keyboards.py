@@ -48,6 +48,16 @@ def template_game_keyboard(template_id: int) -> InlineKeyboardMarkup:
     )
 
 
+def template_preview_keyboard(template_id: int, game: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Выбрать лигу", callback_data=f"template_pick_league:{template_id}:{game}")],
+            [InlineKeyboardButton(text="Назад", callback_data="templates:choose_game")],
+            [InlineKeyboardButton(text="Отмена", callback_data="template:cancel")],
+        ]
+    )
+
+
 def template_league_keyboard(template_id: int, leagues: list[League], game: str) -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(text=league.name, callback_data=f"template_league:{template_id}:{league.id}")]
