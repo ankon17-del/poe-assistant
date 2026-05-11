@@ -260,6 +260,26 @@ def build_recommendations_text(
         )
         return "\n".join(lines)
 
+    best_match = recommendations[0]
+    safest_option = next(
+        (recommendation for recommendation in recommendations if recommendation.archetype in {"tank", "safe"}),
+        recommendations[0],
+    )
+    fastest_option = next(
+        (recommendation for recommendation in recommendations if recommendation.archetype in {"mapper"} or "speed" in recommendation.playstyles),
+        recommendations[0],
+    )
+
+    lines.extend(
+        [
+            "",
+            "Короткий verdict:",
+            f"- Лучший матч под задачу: {best_match.title}",
+            f"- Самый безопасный вариант: {safest_option.title}",
+            f"- Самый быстрый вариант: {fastest_option.title}",
+        ]
+    )
+
     for index, recommendation in enumerate(recommendations, start=1):
         lines.extend(
             [
