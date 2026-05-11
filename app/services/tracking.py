@@ -161,6 +161,13 @@ class TrackingService:
             item.notify_enabled = True
         return len(items)
 
+    async def reactivate_paused_price_alerts_for_game(self, user: User, game: str) -> int:
+        items = await self.list_paused_price_alerts(user)
+        matching_items = [item for item in items if item.league and item.league.realm == game]
+        for item in matching_items:
+            item.notify_enabled = True
+        return len(matching_items)
+
     async def list_items_for_polling(self) -> list[TrackedItem]:
         result = await self.session.scalars(
             select(TrackedItem)

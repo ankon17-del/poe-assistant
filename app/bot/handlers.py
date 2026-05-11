@@ -80,11 +80,18 @@ def build_tracking_list_text(items: list) -> str:
 
 
 def build_paused_alerts_text(items: list) -> str:
+    poe1_count = sum(1 for item in items if item.league and item.league.realm == "poe1")
+    poe2_count = sum(1 for item in items if item.league and item.league.realm == "poe2")
+
     lines = [f"Сработавшие alerts: {len(items)}"]
+    if poe1_count:
+        lines.append(f"POE 1: {poe1_count}")
+    if poe2_count:
+        lines.append(f"POE 2: {poe2_count}")
     for item in items:
         lines.append("\n".join(build_tracking_lines(item)))
     lines.append("")
-    lines.append("Здесь можно быстро вернуть alert в работу или отключить его совсем.")
+    lines.append("Здесь можно быстро вернуть alert в работу целиком, по игре или отключить его совсем.")
     return "\n\n".join(lines)
 
 
@@ -977,6 +984,31 @@ async def reactivate_all_paused_alerts(callback: CallbackQuery) -> None:
         return
 
     await callback.answer(f"Перезапустил alerts: {reactivated_count}")
+    if not callback.message:
+        return
+
+    if not items:
+        await callback.message.edit_text("Сработавших price alerts пока нет. Всё снова активно.")
+        return
+
+    await callback.message.edit_text(build_paused_alerts_text(items), reply_markup=paused_alerts_keyboard(items))
+
+
+@router.callback_query(F.data.startswith("alerts:reactivate_game:"))
+async def reactivate_paused_alerts_for_game(callback: CallbackQuery) -> None:
+    game = callback.data.rsplit(":", 1)[1]
+    game_label = "POE 2" if game == "poe2" else "POE 1"
+
+    async with session_scope() as session:
+        user = await ensure_user(session, callback.from_user.id, callback.from_user.username)
+        reactivated_count = await TrackingService(session).reactivate_paused_price_alerts_for_game(user, game)
+        items = await TrackingService(session).list_paused_price_alerts(user)
+
+    if reactivated_count == 0:
+        await callback.answer(f"Сработавших alerts для {game_label} сейчас нет", show_alert=True)
+        return
+
+    await callback.answer(f"Перезапустил alerts для {game_label}: {reactivated_count}")
     if not callback.message:
         return
 

@@ -24,7 +24,9 @@ def tracking_actions_keyboard(items: list[TrackedItem]) -> InlineKeyboardMarkup:
     rows = []
     for item in items:
         if item.target_price is not None and not item.notify_enabled:
-            rows.append([InlineKeyboardButton(text=f"Перезапустить #{item.id}", callback_data=f"list2:reactivate:{item.id}")])
+            rows.append(
+                [InlineKeyboardButton(text=f"Перезапустить #{item.id}", callback_data=f"list2:reactivate:{item.id}")]
+            )
         rows.append([InlineKeyboardButton(text=f"Отключить #{item.id}", callback_data=f"list2:remove:{item.id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -33,6 +35,12 @@ def paused_alerts_keyboard(items: list[TrackedItem]) -> InlineKeyboardMarkup:
     rows = []
     if items:
         rows.append([InlineKeyboardButton(text="Перезапустить все", callback_data="alerts:reactivate_all")])
+        has_poe1 = any(item.league and item.league.realm == "poe1" for item in items)
+        has_poe2 = any(item.league and item.league.realm == "poe2" for item in items)
+        if has_poe1:
+            rows.append([InlineKeyboardButton(text="Перезапустить все POE 1", callback_data="alerts:reactivate_game:poe1")])
+        if has_poe2:
+            rows.append([InlineKeyboardButton(text="Перезапустить все POE 2", callback_data="alerts:reactivate_game:poe2")])
     for item in items:
         rows.append([InlineKeyboardButton(text=f"Перезапустить #{item.id}", callback_data=f"alerts:reactivate:{item.id}")])
         rows.append([InlineKeyboardButton(text=f"Отключить #{item.id}", callback_data=f"alerts:remove:{item.id}")])
