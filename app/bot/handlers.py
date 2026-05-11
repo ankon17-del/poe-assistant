@@ -209,6 +209,18 @@ def build_economy_text(summaries: list, overview) -> str:
                 f"{format_decimal(alert.current_value)} / {format_decimal(alert.target_price)} {alert.target_currency} "
                 f"({format_decimal(progress_percent)}%)"
             )
+    if overview.market_movements:
+        lines.append("Движение рынка с прошлого snapshot'а:")
+        for movement in overview.market_movements:
+            game_label = "POE 2" if movement.game == "poe2" else "POE 1"
+            currency_label = "Divine Orb" if movement.currency_code == "div" else "Exalted Orb"
+            direction = "рост" if movement.delta_value > 0 else "снижение"
+            delta_percent = movement.delta_ratio.copy_abs() * Decimal("100")
+            lines.append(
+                f"- {currency_label} [{game_label} / {movement.league_name}] "
+                f"{direction}: {format_decimal(movement.previous_value)} -> {format_decimal(movement.current_value)} chaos "
+                f"({format_decimal(delta_percent)}%)"
+            )
 
     for summary in summaries:
         game_label = "POE 2" if summary.game == "poe2" else "POE 1"

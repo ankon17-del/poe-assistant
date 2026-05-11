@@ -42,6 +42,7 @@ class CurrencyMarketSource:
     orbwatch_base_url = "https://orbwatch.trade"
     poe2_dev_currency_url = "https://www.poe2.dev/calculators/currency"
     _exchange_snapshot_cache: dict[tuple[str, str], ExchangeRateSnapshotDTO] = {}
+    _previous_exchange_snapshot_cache: dict[tuple[str, str], ExchangeRateSnapshotDTO] = {}
 
     async def get_exchange_rates(self, league_name: str, game: str | None) -> dict[str, Decimal] | None:
         snapshot = await self.get_exchange_snapshot(league_name=league_name, game=game)
@@ -62,10 +63,25 @@ class CurrencyMarketSource:
 
         cache_key = ((game or "poe1"), league_name)
         if snapshot is not None:
+            previous_snapshot = self._exchange_snapshot_cache.get(cache_key)
+            if previous_snapshot is not None and previous_snapshot.rates != snapshot.rates:
+                self._previous_exchange_snapshot_cache[cache_key] = previous_snapshot
             self._exchange_snapshot_cache[cache_key] = snapshot
             return snapshot
 
         return self._get_cached_exchange_snapshot(cache_key)
+
+    def get_previous_exchange_snapshot(
+        self,
+        *,
+        league_name: str,
+        game: str | None,
+    ) -> ExchangeRateSnapshotDTO | None:
+        if not league_name:
+            return None
+
+        cache_key = ((game or "poe1"), league_name)
+        return self._previous_exchange_snapshot_cache.get(cache_key)
 
     async def get_price(self, request: TrackingRequest) -> PriceSnapshotDTO | None:
         if request.item_type != "currency" or not request.league_name:

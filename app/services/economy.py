@@ -50,6 +50,7 @@ class EconomyOverviewSummary:
     total_paused_currency_alerts: int
     top_watched_currencies: list[TopWatchedCurrencySummary]
     nearest_alerts: list["NearestCurrencyAlertSummary"]
+    market_movements: list["MarketMovementSummary"]
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,17 @@ class NearestCurrencyAlertSummary:
     target_price: Decimal
     target_currency: str
     progress_ratio: Decimal
+
+
+@dataclass(frozen=True)
+class MarketMovementSummary:
+    game: str
+    league_name: str
+    currency_code: str
+    current_value: Decimal
+    previous_value: Decimal
+    delta_value: Decimal
+    delta_ratio: Decimal
 
 
 class EconomyService:
@@ -157,6 +169,7 @@ class EconomyService:
             total_paused_currency_alerts=len(paused_items),
             top_watched_currencies=top_watched,
             nearest_alerts=self._build_nearest_alerts(summaries),
+            market_movements=self._build_market_movements(summaries),
         )
         return summaries, overview
 
@@ -192,6 +205,43 @@ class EconomyService:
 
         nearest.sort(key=lambda item: (item.progress_ratio, item.current_value), reverse=True)
         return nearest[:5]
+
+    def _build_market_movements(self, summaries: list[LeagueEconomySummary]) -> list[MarketMovementSummary]:
+        movements: list[MarketMovementSummary] = []
+        for summary in summaries:
+            current_snapshot = summary.exchange_snapshot
+            if current_snapshot is None:
+                continue
+
+            previous_snapshot = self.currency_market_source.get_previous_exchange_snapshot(
+                league_name=summary.league_name,
+                game=summary.game,
+            )
+            if previous_snapshot is None:
+                continue
+
+            for currency_code in ("div", "ex"):
+                current_value = current_snapshot.rates.get(currency_code)
+                previous_value = previous_snapshot.rates.get(currency_code)
+                if current_value in {None, Decimal("0")} or previous_value in {None, Decimal("0")}:
+                    continue
+
+                delta_value = current_value - previous_value
+                delta_ratio = delta_value / previous_value
+                movements.append(
+                    MarketMovementSummary(
+                        game=summary.game,
+                        league_name=summary.league_name,
+                        currency_code=currency_code,
+                        current_value=current_value,
+                        previous_value=previous_value,
+                        delta_value=delta_value,
+                        delta_ratio=delta_ratio,
+                    )
+                )
+
+        movements.sort(key=lambda item: abs(item.delta_ratio), reverse=True)
+        return movements[:6]
 
     @staticmethod
     def _resolve_currency_value(
