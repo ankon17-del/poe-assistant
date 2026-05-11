@@ -52,6 +52,7 @@ class EconomyOverviewSummary:
     nearest_alerts: list["NearestCurrencyAlertSummary"]
     market_movements: list["MarketMovementSummary"]
     market_pulse: "MarketPulseSummary | None"
+    market_hints: list["MarketHintSummary"]
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,12 @@ class MarketPulseSummary:
     hottest_movement: MarketMovementSummary | None
     hottest_alert: NearestCurrencyAlertSummary | None
     total_moving_markets: int
+
+
+@dataclass(frozen=True)
+class MarketHintSummary:
+    title: str
+    detail: str
 
 
 class EconomyService:
@@ -185,6 +192,11 @@ class EconomyService:
                 nearest_alerts=nearest_alerts,
                 market_movements=market_movements,
             ),
+            market_hints=self._build_market_hints(
+                nearest_alerts=nearest_alerts,
+                market_movements=market_movements,
+                total_active_currency_alerts=len(active_items),
+            ),
         )
         return summaries, overview
 
@@ -273,6 +285,86 @@ class EconomyService:
             hottest_alert=hottest_alert,
             total_moving_markets=len(market_movements),
         )
+
+    @staticmethod
+    def _build_market_hints(
+        *,
+        nearest_alerts: list[NearestCurrencyAlertSummary],
+        market_movements: list[MarketMovementSummary],
+        total_active_currency_alerts: int,
+    ) -> list[MarketHintSummary]:
+        hints: list[MarketHintSummary] = []
+
+        hottest_alert = nearest_alerts[0] if nearest_alerts else None
+        if hottest_alert is not None:
+            progress_percent = hottest_alert.progress_ratio * Decimal("100")
+            game_label = "POE 2" if hottest_alert.game == "poe2" else "POE 1"
+            if hottest_alert.progress_ratio >= Decimal("0.95"):
+                hints.append(
+                    MarketHintSummary(
+                        title="Почти сработало",
+                        detail=(
+                            f"#{hottest_alert.tracked_item_id} {hottest_alert.item_name} "
+                            f"[{game_label} / {hottest_alert.league_name}] уже на "
+                            f"{progress_percent.quantize(Decimal('1.0'))}% от порога."
+                        ),
+                    )
+                )
+            elif hottest_alert.progress_ratio >= Decimal("0.80"):
+                hints.append(
+                    MarketHintSummary(
+                        title="Горячий alert",
+                        detail=(
+                            f"#{hottest_alert.tracked_item_id} {hottest_alert.item_name} "
+                            f"[{game_label} / {hottest_alert.league_name}] уже близко: "
+                            f"{progress_percent.quantize(Decimal('1.0'))}% до срабатывания."
+                        ),
+                    )
+                )
+
+        hottest_movement = market_movements[0] if market_movements else None
+        if hottest_movement is not None:
+            game_label = "POE 2" if hottest_movement.game == "poe2" else "POE 1"
+            currency_label = "Divine Orb" if hottest_movement.currency_code == "div" else "Exalted Orb"
+            delta_percent = (hottest_movement.delta_ratio.copy_abs() * Decimal("100")).quantize(Decimal("1.0"))
+            if hottest_movement.delta_ratio.copy_abs() >= Decimal("0.10"):
+                direction = "ускорился" if hottest_movement.delta_value > 0 else "просел"
+                hints.append(
+                    MarketHintSummary(
+                        title="Рынок двинулся",
+                        detail=(
+                            f"{currency_label} [{game_label} / {hottest_movement.league_name}] "
+                            f"{direction} на {delta_percent}% с прошлого snapshot'а."
+                        ),
+                    )
+                )
+            elif hottest_movement.delta_ratio.copy_abs() >= Decimal("0.05"):
+                hints.append(
+                    MarketHintSummary(
+                        title="Есть движение",
+                        detail=(
+                            f"{currency_label} [{game_label} / {hottest_movement.league_name}] "
+                            f"изменился на {delta_percent}%. Стоит поглядывать чаще."
+                        ),
+                    )
+                )
+
+        if not hints and total_active_currency_alerts > 0:
+            hints.append(
+                MarketHintSummary(
+                    title="Рынок спокойный",
+                    detail="Сильных движений нет. Держим alerts активными и просто наблюдаем.",
+                )
+            )
+        elif not hints and total_active_currency_alerts == 0:
+            hints.append(
+                MarketHintSummary(
+                    title="Пока нечего ловить",
+                    detail="Активных currency alerts нет. Добавь watcher через /add или шаблон через /templates.",
+                )
+            )
+
+        return hints[:3]
 
     @staticmethod
     def _resolve_currency_value(

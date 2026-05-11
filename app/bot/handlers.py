@@ -186,6 +186,10 @@ def build_economy_text(summaries: list, overview) -> str:
     lines.append("")
     lines.append(f"Активные currency alerts: {overview.total_active_currency_alerts}")
     lines.append(f"Сработавшие alerts на паузе: {overview.total_paused_currency_alerts}")
+    if overview.market_hints:
+        lines.append("Что делать сейчас:")
+        for hint in overview.market_hints:
+            lines.append(f"- {hint.title}: {hint.detail}")
     if overview.market_pulse:
         lines.append("Market pulse:")
         if overview.market_pulse.hottest_movement:
