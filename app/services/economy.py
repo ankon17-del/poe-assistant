@@ -49,6 +49,19 @@ class EconomyOverviewSummary:
     total_active_currency_alerts: int
     total_paused_currency_alerts: int
     top_watched_currencies: list[TopWatchedCurrencySummary]
+    nearest_alerts: list["NearestCurrencyAlertSummary"]
+
+
+@dataclass(frozen=True)
+class NearestCurrencyAlertSummary:
+    tracked_item_id: int
+    item_name: str
+    game: str
+    league_name: str
+    current_value: Decimal
+    target_price: Decimal
+    target_currency: str
+    progress_ratio: Decimal
 
 
 class EconomyService:
@@ -143,8 +156,79 @@ class EconomyService:
             total_active_currency_alerts=len(active_items),
             total_paused_currency_alerts=len(paused_items),
             top_watched_currencies=top_watched,
+            nearest_alerts=self._build_nearest_alerts(summaries),
         )
         return summaries, overview
+
+    def _build_nearest_alerts(self, summaries: list[LeagueEconomySummary]) -> list[NearestCurrencyAlertSummary]:
+        nearest: list[NearestCurrencyAlertSummary] = []
+        for summary in summaries:
+            snapshot = summary.exchange_snapshot
+            if snapshot is None:
+                continue
+
+            for watcher in summary.active_watchers:
+                current_value = self._resolve_currency_value(
+                    item_name=watcher.item_name,
+                    target_currency=watcher.target_currency,
+                    rates=snapshot.rates,
+                )
+                if current_value is None or watcher.target_price <= 0:
+                    continue
+
+                progress_ratio = current_value / watcher.target_price
+                nearest.append(
+                    NearestCurrencyAlertSummary(
+                        tracked_item_id=watcher.tracked_item_id,
+                        item_name=watcher.item_name,
+                        game=summary.game,
+                        league_name=summary.league_name,
+                        current_value=current_value,
+                        target_price=watcher.target_price,
+                        target_currency=watcher.target_currency,
+                        progress_ratio=progress_ratio,
+                    )
+                )
+
+        nearest.sort(key=lambda item: (item.progress_ratio, item.current_value), reverse=True)
+        return nearest[:5]
+
+    @staticmethod
+    def _resolve_currency_value(
+        *,
+        item_name: str,
+        target_currency: str,
+        rates: dict[str, Decimal],
+    ) -> Decimal | None:
+        normalized_name = item_name.strip().lower()
+        normalized_currency = target_currency.strip().lower()
+
+        chaos_value: Decimal | None = None
+        if normalized_name == "chaos orb":
+            chaos_value = Decimal("1")
+        elif normalized_name == "exalted orb":
+            chaos_value = rates.get("ex")
+        elif normalized_name == "divine orb":
+            chaos_value = rates.get("div")
+        else:
+            return None
+
+        if chaos_value is None:
+            return None
+
+        if normalized_currency == "chaos":
+            return chaos_value
+        if normalized_currency == "ex":
+            ex_rate = rates.get("ex")
+            if ex_rate in {None, Decimal("0")}:
+                return None
+            return chaos_value / ex_rate
+        if normalized_currency == "div":
+            div_rate = rates.get("div")
+            if div_rate in {None, Decimal("0")}:
+                return None
+            return chaos_value / div_rate
+        return None
 
     async def _baseline_league_pairs(self) -> list[tuple[str, str]]:
         pairs: list[tuple[str, str]] = []

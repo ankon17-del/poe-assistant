@@ -105,6 +105,17 @@ def build_economy_text(summaries: list, overview) -> str:
             if details:
                 line += f" ({', '.join(details)})"
             lines.append(line)
+    if overview.nearest_alerts:
+        lines.append("Ближе всего к срабатыванию:")
+        for alert in overview.nearest_alerts:
+            game_label = "POE 2" if alert.game == "poe2" else "POE 1"
+            progress_percent = min(alert.progress_ratio * Decimal("100"), Decimal("999"))
+            lines.append(
+                f"- #{alert.tracked_item_id} {alert.item_name} "
+                f"[{game_label} / {alert.league_name}] "
+                f"{format_decimal(alert.current_value)} / {format_decimal(alert.target_price)} {alert.target_currency} "
+                f"({format_decimal(progress_percent)}%)"
+            )
 
     for summary in summaries:
         game_label = "POE 2" if summary.game == "poe2" else "POE 1"
