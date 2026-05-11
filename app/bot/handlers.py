@@ -288,21 +288,28 @@ def build_recommendations_text(
                 f"Класс: {recommendation.class_name}",
                 f"Ядро: {recommendation.core_skill}",
                 recommendation.summary,
+                f"Примерный бюджет: {recommendation.budget_estimate}",
+                f"Покупать в первую очередь: {', '.join(recommendation.buy_priority)}",
+                f"Какие статы добирать: {', '.join(recommendation.stat_targets)}",
                 f"Первые апгрейды: {', '.join(recommendation.first_upgrades)}",
                 f"Для комфорта: {', '.join(recommendation.comfort_upgrades)}",
                 f"Для урона: {', '.join(recommendation.damage_upgrades)}",
                 f"Закрыть по защите: {', '.join(recommendation.defense_fixes)}",
-                f"Если хочется похожее, но по-другому: {recommendation.alternative_hint}",
+                f"Дерево / приоритеты прокачки: {', '.join(recommendation.tree_focus)}",
+                f"Атлас / направление фарма: {', '.join(recommendation.atlas_focus)}",
+                f"Что этим билдом фармить: {', '.join(recommendation.farm_mechanics)}",
+                f"Пантеон / заметки по защите: {', '.join(recommendation.pantheon_or_defense_notes)}",
                 f"Сильные стороны: {', '.join(recommendation.strengths)}",
-                f"Смотри в экипировке: {', '.join(recommendation.gear_focus)}",
+                f"На каких слотах и архетипе шмоток фокус: {', '.join(recommendation.gear_focus)}",
                 f"Осторожно: {', '.join(recommendation.cautions)}",
+                f"Если хочется похожее, но по-другому: {recommendation.alternative_hint}",
             ]
         )
 
     lines.extend(
         [
             "",
-            "Это первый foundation-слой build assistant. Дальше мы сможем сделать рекомендации глубже и умнее.",
+            "Это уже рабочий build guide foundation: можно смотреть бюджет, слоты, статы, дерево и фарм-контур. Дальше будем углублять до ещё более точных PoE-гайдов.",
         ]
     )
     return "\n".join(lines)
