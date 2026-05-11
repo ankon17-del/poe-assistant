@@ -299,6 +299,9 @@ def build_recommendations_text(
                 f"Атлас / направление фарма: {', '.join(recommendation.atlas_focus)}",
                 f"Что этим билдом фармить: {', '.join(recommendation.farm_mechanics)}",
                 f"Пантеон / заметки по защите: {', '.join(recommendation.pantheon_or_defense_notes)}",
+                f"Эндгейм-цели для билда: {', '.join(recommendation.endgame_goals)}",
+                f"Когда билд уже считается собранным для эндгейма: {', '.join(recommendation.endgame_milestones)}",
+                f"Дорогие chase-апгрейды: {', '.join(recommendation.chase_upgrades)}",
                 f"Сильные стороны: {', '.join(recommendation.strengths)}",
                 f"На каких слотах и архетипе шмоток фокус: {', '.join(recommendation.gear_focus)}",
                 f"Осторожно: {', '.join(recommendation.cautions)}",
@@ -309,7 +312,7 @@ def build_recommendations_text(
     lines.extend(
         [
             "",
-            "Это уже рабочий build guide foundation: можно смотреть бюджет, слоты, статы, дерево и фарм-контур. Дальше будем углублять до ещё более точных PoE-гайдов.",
+            "Это уже рабочий endgame build guide foundation: можно смотреть бюджет, апгрейд-путь, слоты, дерево, атлас, фарм и endgame-ориентиры. Дальше будем делать ещё точнее по конкретным версиям билдов.",
         ]
     )
     return "\n".join(lines)

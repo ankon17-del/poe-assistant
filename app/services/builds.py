@@ -23,6 +23,9 @@ class BuildRecommendation:
     atlas_focus: tuple[str, ...]
     farm_mechanics: tuple[str, ...]
     pantheon_or_defense_notes: tuple[str, ...]
+    endgame_goals: tuple[str, ...]
+    endgame_milestones: tuple[str, ...]
+    chase_upgrades: tuple[str, ...]
     first_upgrades: tuple[str, ...]
     comfort_upgrades: tuple[str, ...]
     damage_upgrades: tuple[str, ...]
@@ -52,6 +55,9 @@ class BuildService:
             atlas_focus=("быстрый sustain карт", "сильный pack size", "altars и map duplication"),
             farm_mechanics=("Legion", "Harbinger", "Expedition", "Strongboxes"),
             pantheon_or_defense_notes=("Major: Lunaris для маппинга", "Minor: Garukhan/Shakari по ситуации"),
+            endgame_goals=("быстрый T16 mapping", "фарм altar-циклов", "Legion/Expedition ротации"),
+            endgame_milestones=("лук, который уже уверенно чистит T16 без просадки по редким", "cap spell suppression и нормальный life pool", "6-link + quiver, после которых можно жать pack size смелее"),
+            chase_upgrades=("топовый crit ele bow", "сильный quiver с crit multi и speed", "дорогие jewel / cluster-слоты под чистый DPS"),
             first_upgrades=("нормальный лук", "6-link под основную связку", "точность и crit consistency"),
             comfort_upgrades=("больше attack speed", "quiver с quality-of-life статами", "move speed на ботинках"),
             damage_upgrades=("лучший ele bow", "crit multi", "дополнительные projectile scaling слои"),
@@ -78,6 +84,9 @@ class BuildService:
             atlas_focus=("одиночные жирные цели", "контент с хорошим reward per encounter", "меньше упора в супер-скорость"),
             farm_mechanics=("Essence", "Expedition", "Harvest", "Maven / boss rushing"),
             pantheon_or_defense_notes=("Major: Solaris для тяжёлых целей", "Minor: Shakari/Abberath по встречному урону"),
+            endgame_goals=("Maven / guardian / invitation farming", "точечный фарм жирных encounter'ов", "универсальный endgame без упора в zoom"),
+            endgame_milestones=("уровни камней и crit уже держат single target на боссах", "mine throw speed не ломает ритм билда", "хаос-рез и suppression не проваливаются на invitation-контенте"),
+            chase_upgrades=("топовый wand/sceptre с gem levels", "амулет под дорогой gem-level scaling", "дорогие crit multi jewels и luxury curse setup"),
             first_upgrades=("уровни камней", "нормальный wand / sceptre", "mine throw speed"),
             comfort_upgrades=("faster detonation feel", "mana comfort", "movement quality-of-life"),
             damage_upgrades=("gem levels", "crit multi", "better curse / exposure setup"),
@@ -104,6 +113,9 @@ class BuildService:
             atlas_focus=("плотный, но спокойный маппинг", "механики без резких one-shot проверок", "контент, где RF просто идёт вперёд"),
             farm_mechanics=("Expedition", "Blight", "Harvest", "Strongboxes"),
             pantheon_or_defense_notes=("Major: Arakaali или Lunaris", "Minor: Abberath для ground degens"),
+            endgame_goals=("спокойный T16 sustain", "Blight/Expedition фарм", "комфортный progression без рваного геймплея"),
+            endgame_milestones=("RF sustain больше не проседает на плотных картах", "max fire res и regen уже держат неприятные моды", "броня и life позволяют не ловить случайные ваншоты от карты"),
+            chase_upgrades=("дорогой sceptre/shield под fire dot", "максимизация +max fire res", "luxury jewels и слоты на regen/dot multi"),
             first_upgrades=("cap резистов", "regen", "+max fire res"),
             comfort_upgrades=("movement speed", "radius / clear comfort", "recovery feel"),
             damage_upgrades=("burning damage", "gem levels", "dot multi where applicable"),
@@ -130,6 +142,9 @@ class BuildService:
             atlas_focus=("быстрый clear и возврат к следующей пачке", "контент, где ценится coverage", "early economy farming"),
             farm_mechanics=("Breach", "Ritual", "Strongboxes", "Expedition"),
             pantheon_or_defense_notes=("В POE2 вместо пантеона держи фокус на mana sustain", "не жертвуй защитой ради одного только урона"),
+            endgame_goals=("стабильный POE2 mapping", "currency rotations через плотные механики", "универсальный endgame без тяжёлого микроменеджмента"),
+            endgame_milestones=("cast speed и sustain уже не тормозят темп карты", "билд без боли держит плотные паки и редких", "weapon/focus достаточно сильные, чтобы не буксовать на tanky encounters"),
+            chase_upgrades=("топовый wand/focus под lightning", "дорогие crit/shock value слоты", "luxury jewels и редкие слоты на кастерский ceiling"),
             first_upgrades=("cast speed", "mana sustain", "уровни основного камня"),
             comfort_upgrades=("быстрый cast feel", "удобный movement setup", "качество life/mana flask слоя"),
             damage_upgrades=("lightning scaling", "crit / shock value", "лучший weapon/focus"),
@@ -156,6 +171,9 @@ class BuildService:
             atlas_focus=("быстрые карты, где можно держать темп", "контент с плотными пачками", "механики, где взрывы clear ощущаются лучше"),
             farm_mechanics=("Breach", "Ritual", "Delirium-подобный плотный контент, если тянет", "Strongboxes"),
             pantheon_or_defense_notes=("В POE2 ключ — не проседать по защите ради оружия", "для melee чувствуется каждая дырка по defense"),
+            endgame_goals=("агрессивный endgame mapping", "фарм плотных пачек", "быстрый цикл карт ради валюты"),
+            endgame_milestones=("оружие уже не тормозит clear в high-tier картах", "melee survive-слой держит плотные паки", "attack speed и sustain позволяют не рвать ротацию"),
+            chase_upgrades=("топовое endgame-оружие", "дорогие offensive аксессуары под cold/crit", "luxury defensive pieces, чтобы билд не был стеклянным"),
             first_upgrades=("оружие с нормальным DPS", "attack speed", "связка под clear"),
             comfort_upgrades=("качество мувмента", "ресурс на sustain", "упрощение clear-loop"),
             damage_upgrades=("лучшее оружие", "cold scaling", "crit / penetration где доступно"),
@@ -182,6 +200,9 @@ class BuildService:
             atlas_focus=("контент, который не заставляет постоянно спринтовать", "стабильный фарм с безопасным позиционированием", "постепенное раскручивание экономики"),
             farm_mechanics=("Expedition", "Blight", "Ritual", "Harbinger"),
             pantheon_or_defense_notes=("В POE2 здесь выигрывает спокойный темп", "сначала комфорт summon-loop, потом жадность в урон"),
+            endgame_goals=("безопасный endgame progression", "спокойный фарм плотного контента", "длинные игровые сессии без утомляющего микроменеджмента"),
+            endgame_milestones=("миньоны не разваливаются на плотных encounters", "spirit/setup хватает без постоянной нехватки ресурса", "твоя защита не проседает в high-tier контенте"),
+            chase_upgrades=("дорогие уровни minion gems", "luxury spirit / minion jewels", "эндгейм-щит/фокус под потолок урона и защиты"),
             first_upgrades=("уровни minion-камней", "spirit economy", "база по защите"),
             comfort_upgrades=("удобный summon loop", "ресурс под поддерживающие кнопки", "плавность clear"),
             damage_upgrades=("minion levels", "миньон-урон", "лучший support setup"),
@@ -208,6 +229,9 @@ class BuildService:
             atlas_focus=("контент, где важен single target и reward per encounter", "меньше упора в тупой blitz", "где можно разыграть сильный урон"),
             farm_mechanics=("Boss rushing", "Essence", "Expedition", "Ritual"),
             pantheon_or_defense_notes=("В POE2 следи за тем, чтобы не собрать только урон", "для Huntress позиционка и sustain ощущаются очень сильно"),
+            endgame_goals=("boss rushing", "фарм жирных точечных encounter'ов", "смешанный currency + boss value контур"),
+            endgame_milestones=("лук уже держит single target без долгих простоев", "ротация не разваливается на живых боссах", "защита не падает в ноль, пока билд раскрывает урон"),
+            chase_upgrades=("топовый bow под chaos/poison версию", "дорогой quiver/amulet под ceiling single target", "luxury jewels под боссинг и smooth uptime"),
             first_upgrades=("лук с хорошим base DPS", "attack uptime", "ядро под single target"),
             comfort_upgrades=("speed/feel в ротации", "ресурс на sustain", "чистка packs без просадки"),
             damage_upgrades=("chaos / poison scaling", "лучший bow", "single-target multipliers"),
@@ -234,6 +258,9 @@ class BuildService:
             atlas_focus=("контент, где важна плотность и жирность целей", "спокойный прогресс в картах", "reward per tough encounter"),
             farm_mechanics=("Expedition", "Essence", "Boss farming", "Strongboxes"),
             pantheon_or_defense_notes=("В POE2 здесь сила в том, чтобы не быть стеклянным", "сначала оружие и броня, потом роскошь"),
+            endgame_goals=("жирный endgame progression", "bossing и tough encounters", "спокойный high-tier mapping без стеклянности"),
+            endgame_milestones=("оружие и slam-ядро уже уверенно ломают high-tier rares и боссов", "броня/life слой не проседает под реальным endgame уроном", "ротация стала достаточно быстрой, чтобы билд не ощущался вязким"),
+            chase_upgrades=("топовое physical weapon", "luxury armour pieces под cap defenses", "дорогие jewels и аксессуары под massive hit ceiling"),
             first_upgrades=("оружие", "armour база", "основная slam-связка"),
             comfort_upgrades=("ускорение ротации", "ресурс на sustain", "качество передвижения"),
             damage_upgrades=("weapon DPS", "physical scaling", "heavy hit multipliers"),
