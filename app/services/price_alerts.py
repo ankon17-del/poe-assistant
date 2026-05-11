@@ -97,8 +97,10 @@ class PriceAlertService:
 
     @staticmethod
     def _format_decimal(value: Decimal) -> str:
-        normalized = value.normalize()
-        return format(normalized, "f").rstrip("0").rstrip(".") or "0"
+        text = format(value.normalize(), "f")
+        if "." in text:
+            text = text.rstrip("0").rstrip(".")
+        return text or "0"
 
     @staticmethod
     def _price_alert_actions_keyboard(tracked_item_id: int) -> InlineKeyboardMarkup:
