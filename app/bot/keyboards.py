@@ -105,6 +105,38 @@ def account_keyboard(connect_url: str | None, is_connected: bool) -> InlineKeybo
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def build_game_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="POE 2", callback_data="builds:game:poe2")],
+            [InlineKeyboardButton(text="POE 1", callback_data="builds:game:poe1")],
+        ]
+    )
+
+
+def build_budget_keyboard(game: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Стартовый", callback_data=f"builds:budget:{game}:starter")],
+            [InlineKeyboardButton(text="Средний", callback_data=f"builds:budget:{game}:mid")],
+            [InlineKeyboardButton(text="Высокий", callback_data=f"builds:budget:{game}:high")],
+            [InlineKeyboardButton(text="Назад", callback_data="builds:back:game")],
+        ]
+    )
+
+
+def build_playstyle_keyboard(game: str, budget_tier: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Быстрый фарм", callback_data=f"builds:playstyle:{game}:{budget_tier}:speed")],
+            [InlineKeyboardButton(text="Спокойный / живучий", callback_data=f"builds:playstyle:{game}:{budget_tier}:safe")],
+            [InlineKeyboardButton(text="Боссинг", callback_data=f"builds:playstyle:{game}:{budget_tier}:boss")],
+            [InlineKeyboardButton(text="Универсальный", callback_data=f"builds:playstyle:{game}:{budget_tier}:allround")],
+            [InlineKeyboardButton(text="Назад", callback_data=f"builds:back:budget:{game}")],
+        ]
+    )
+
+
 def add_entry_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[

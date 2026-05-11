@@ -6,7 +6,7 @@ Current implementation status and next priorities are tracked in [ROADMAP_V2.md]
 
 ## MVP Scope
 
-- Telegram bot with `/start`, `/help`, `/add`, `/remove`, `/list`, `/alerts`, `/account`, `/stats`, `/economy`, `/templates`, `/settings`.
+- Telegram bot with `/start`, `/help`, `/add`, `/remove`, `/list`, `/alerts`, `/account`, `/builds`, `/stats`, `/economy`, `/templates`, `/settings`.
 - League-first SQLAlchemy models.
 - Template packs generate independent tracking configs.
 - Integration and worker placeholders are isolated from bot handlers.

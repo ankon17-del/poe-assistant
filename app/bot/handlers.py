@@ -13,6 +13,9 @@ from app.bot.dependencies import session_scope
 from app.bot.keyboards import (
     add_entry_keyboard,
     account_keyboard,
+    build_budget_keyboard,
+    build_game_keyboard,
+    build_playstyle_keyboard,
     currency_presets_keyboard,
     duplicate_resolution_keyboard,
     game_keyboard,
@@ -27,6 +30,7 @@ from app.bot.keyboards import (
     threshold_currency_keyboard,
     tracking_actions_keyboard,
 )
+from app.services.builds import BuildRecommendation, BuildService
 from app.models.enums import IntegrationType
 from app.models.league import League
 from app.services.economy import EconomyService
@@ -178,6 +182,87 @@ def build_template_activation_text(result, league) -> str:
         lines.append("Обновлены или реактивированы:")
         lines.extend(f"- {item_name}" for item_name in result.updated_items)
 
+    return "\n".join(lines)
+
+
+def build_assistant_intro_text() -> str:
+    return (
+        "Build assistant:\n\n"
+        "Помогу подобрать стартовое направление под игру, бюджет и стиль.\n"
+        "Сначала выбери POE 1 или POE 2."
+    )
+
+
+def build_budget_prompt_text(game: str) -> str:
+    game_label = BuildService.game_label(game)
+    return (
+        f"Build assistant · {game_label}\n\n"
+        "Теперь выбери бюджетный уровень. Это не точная валюта, а скорее стадия готовности:\n"
+        "- стартовый\n"
+        "- средний\n"
+        "- высокий"
+    )
+
+
+def build_playstyle_prompt_text(game: str, budget_tier: str) -> str:
+    game_label = BuildService.game_label(game)
+    budget_label = BuildService.budget_label(budget_tier)
+    return (
+        f"Build assistant · {game_label}\n"
+        f"Бюджет: {budget_label}\n\n"
+        "Какой стиль тебе ближе?"
+    )
+
+
+def build_recommendations_text(
+    *,
+    game: str,
+    budget_tier: str,
+    playstyle: str,
+    recommendations: list[BuildRecommendation],
+) -> str:
+    game_label = BuildService.game_label(game)
+    budget_label = BuildService.budget_label(budget_tier)
+    playstyle_label = BuildService.playstyle_label(playstyle)
+
+    lines = [
+        "Build assistant:",
+        "",
+        f"Игра: {game_label}",
+        f"Бюджет: {budget_label}",
+        f"Стиль: {playstyle_label}",
+    ]
+
+    if not recommendations:
+        lines.extend(
+            [
+                "",
+                "Пока не нашёл подходящий билд под такой фильтр.",
+                "Попробуй соседний стиль или другой уровень бюджета.",
+            ]
+        )
+        return "\n".join(lines)
+
+    for index, recommendation in enumerate(recommendations, start=1):
+        lines.extend(
+            [
+                "",
+                f"{index}. {recommendation.title}",
+                f"Класс: {recommendation.class_name}",
+                f"Ядро: {recommendation.core_skill}",
+                recommendation.summary,
+                f"Сильные стороны: {', '.join(recommendation.strengths)}",
+                f"Смотри в экипировке: {', '.join(recommendation.gear_focus)}",
+                f"Осторожно: {', '.join(recommendation.cautions)}",
+            ]
+        )
+
+    lines.extend(
+        [
+            "",
+            "Это первый foundation-слой build assistant. Дальше мы сможем сделать рекомендации глубже и умнее.",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -496,6 +581,7 @@ async def start(message: Message) -> None:
         "Привет! Я POE / POE2 ассистент для трекинга торговли, статистики и шаблонов.\n\n"
         "Быстрый старт:\n"
         "/add\n"
+        "/builds\n"
         "/list\n"
         "/account\n"
         "/alerts\n"
@@ -513,6 +599,7 @@ async def help_command(message: Message) -> None:
         "/add <название>\n"
         "/add <название> | <цена> [ex|chaos|div]\n"
         "/add <trade_url>\n"
+        "/builds - подбор билд-направления по игре, бюджету и стилю\n"
         "/remove <id> - отключить трекинг\n"
         "/list - список активного трекинга\n"
         "/account - привязка PoE аккаунта и статус подключения\n"
@@ -528,6 +615,11 @@ async def help_command(message: Message) -> None:
 async def account(message: Message) -> None:
     text, keyboard = await load_account_panel(message.from_user.id, message.from_user.username)
     await message.answer(text, reply_markup=keyboard)
+
+
+@router.message(Command("builds"))
+async def builds(message: Message) -> None:
+    await message.answer(build_assistant_intro_text(), reply_markup=build_game_keyboard())
 
 
 @router.message(Command("add"))
@@ -1239,6 +1331,57 @@ async def disconnect_account(callback: CallbackQuery) -> None:
     await callback.answer("PoE аккаунт отключён")
     if callback.message:
         await callback.message.edit_text(text, reply_markup=keyboard)
+
+
+@router.callback_query(F.data == "builds:back:game")
+async def builds_back_to_game(callback: CallbackQuery) -> None:
+    if callback.message:
+        await callback.message.edit_text(build_assistant_intro_text(), reply_markup=build_game_keyboard())
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("builds:game:"))
+async def builds_choose_budget(callback: CallbackQuery) -> None:
+    game = callback.data.rsplit(":", 1)[1]
+    if callback.message:
+        await callback.message.edit_text(build_budget_prompt_text(game), reply_markup=build_budget_keyboard(game))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("builds:back:budget:"))
+async def builds_back_to_budget(callback: CallbackQuery) -> None:
+    game = callback.data.rsplit(":", 1)[1]
+    if callback.message:
+        await callback.message.edit_text(build_budget_prompt_text(game), reply_markup=build_budget_keyboard(game))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("builds:budget:"))
+async def builds_choose_playstyle(callback: CallbackQuery) -> None:
+    _, _, game, budget_tier = callback.data.split(":")
+    if callback.message:
+        await callback.message.edit_text(
+            build_playstyle_prompt_text(game, budget_tier),
+            reply_markup=build_playstyle_keyboard(game, budget_tier),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("builds:playstyle:"))
+async def builds_show_recommendations(callback: CallbackQuery) -> None:
+    _, _, game, budget_tier, playstyle = callback.data.split(":")
+    recommendations = BuildService().recommend(game=game, budget_tier=budget_tier, playstyle=playstyle)
+    if callback.message:
+        await callback.message.edit_text(
+            build_recommendations_text(
+                game=game,
+                budget_tier=budget_tier,
+                playstyle=playstyle,
+                recommendations=recommendations,
+            ),
+            reply_markup=build_playstyle_keyboard(game, budget_tier),
+        )
+    await callback.answer()
 
 
 @router.message(Command("stats"))
