@@ -281,42 +281,50 @@ def build_recommendations_text(
     )
 
     for index, recommendation in enumerate(recommendations, start=1):
-        lines.extend(
-            [
-                "",
-                f"{index}. {recommendation.title}",
-                f"Класс: {recommendation.class_name}",
-                f"Ядро: {recommendation.core_skill}",
-                recommendation.summary,
-                f"Примерный бюджет: {recommendation.budget_estimate}",
-                f"Покупать в первую очередь: {', '.join(recommendation.buy_priority)}",
-                f"Какие статы добирать: {', '.join(recommendation.stat_targets)}",
-                f"Первые апгрейды: {', '.join(recommendation.first_upgrades)}",
-                f"Для комфорта: {', '.join(recommendation.comfort_upgrades)}",
-                f"Для урона: {', '.join(recommendation.damage_upgrades)}",
-                f"Закрыть по защите: {', '.join(recommendation.defense_fixes)}",
-                f"Дерево / приоритеты прокачки: {', '.join(recommendation.tree_focus)}",
-                f"Атлас / направление фарма: {', '.join(recommendation.atlas_focus)}",
-                f"Что этим билдом фармить: {', '.join(recommendation.farm_mechanics)}",
-                f"Пантеон / заметки по защите: {', '.join(recommendation.pantheon_or_defense_notes)}",
-                "Эндгейм-чеклист по слотам:",
-                *[f"  - {entry}" for entry in recommendation.endgame_slot_checklist],
-                f"Эндгейм-цели для билда: {', '.join(recommendation.endgame_goals)}",
-                f"Когда билд уже считается собранным для эндгейма: {', '.join(recommendation.endgame_milestones)}",
-                f"Дорогие chase-апгрейды: {', '.join(recommendation.chase_upgrades)}",
-                f"Сильные стороны: {', '.join(recommendation.strengths)}",
-                f"На каких слотах и архетипе шмоток фокус: {', '.join(recommendation.gear_focus)}",
-                f"Осторожно: {', '.join(recommendation.cautions)}",
-                f"Если хочется похожее, но по-другому: {recommendation.alternative_hint}",
-            ]
-        )
+        if index == 1:
+            lines.extend(
+                [
+                    "",
+                    f"{index}. {recommendation.title}",
+                    f"Класс: {recommendation.class_name}",
+                    f"Ядро: {recommendation.core_skill}",
+                    recommendation.summary,
+                    f"Примерный бюджет: {recommendation.budget_estimate}",
+                    f"Покупать в первую очередь: {', '.join(recommendation.buy_priority)}",
+                    f"Какие статы добирать: {', '.join(recommendation.stat_targets)}",
+                    f"Первые апгрейды: {', '.join(recommendation.first_upgrades)}",
+                    f"Для комфорта: {', '.join(recommendation.comfort_upgrades)}",
+                    f"Для урона: {', '.join(recommendation.damage_upgrades)}",
+                    f"Закрыть по защите: {', '.join(recommendation.defense_fixes)}",
+                    f"Дерево / приоритеты прокачки: {', '.join(recommendation.tree_focus)}",
+                    f"Атлас / направление фарма: {', '.join(recommendation.atlas_focus)}",
+                    f"Что этим билдом фармить: {', '.join(recommendation.farm_mechanics)}",
+                    f"Пантеон / заметки по защите: {', '.join(recommendation.pantheon_or_defense_notes)}",
+                    "Эндгейм-чеклист по слотам:",
+                    *[f"  - {entry}" for entry in recommendation.endgame_slot_checklist],
+                    f"Эндгейм-цели для билда: {', '.join(recommendation.endgame_goals)}",
+                    f"Когда билд уже считается собранным для эндгейма: {', '.join(recommendation.endgame_milestones)}",
+                    f"Дорогие chase-апгрейды: {', '.join(recommendation.chase_upgrades)}",
+                    f"На каких слотах и архетипе шмоток фокус: {', '.join(recommendation.gear_focus)}",
+                    f"Осторожно: {', '.join(recommendation.cautions)}",
+                    f"Если хочется похожее, но по-другому: {recommendation.alternative_hint}",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    "",
+                    f"{index}. {recommendation.title}",
+                    f"Класс: {recommendation.class_name}",
+                    f"Ядро: {recommendation.core_skill}",
+                    f"Бюджет: {recommendation.budget_estimate}",
+                    f"Фарм-контур: {', '.join(recommendation.farm_mechanics)}",
+                    f"Эндгейм-фокус: {', '.join(recommendation.endgame_goals)}",
+                    f"Что купить сначала: {', '.join(recommendation.buy_priority)}",
+                    f"Если брать как альтернативу: {recommendation.alternative_hint}",
+                ]
+            )
 
-    lines.extend(
-        [
-            "",
-            "Это уже рабочий endgame build guide foundation: можно смотреть бюджет, апгрейд-путь, слоты, дерево, атлас, фарм и endgame-ориентиры. Дальше будем делать ещё точнее по конкретным версиям билдов.",
-        ]
-    )
     return "\n".join(lines)
 
 
