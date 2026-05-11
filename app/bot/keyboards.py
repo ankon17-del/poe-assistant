@@ -20,6 +20,26 @@ def templates_keyboard(templates: list[TemplateGroup]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def template_game_keyboard(template_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="POE 2", callback_data=f"template_game:{template_id}:poe2")],
+            [InlineKeyboardButton(text="POE 1", callback_data=f"template_game:{template_id}:poe1")],
+            [InlineKeyboardButton(text="Отмена", callback_data="template:cancel")],
+        ]
+    )
+
+
+def template_league_keyboard(template_id: int, leagues: list[League], game: str) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(text=league.name, callback_data=f"template_league:{template_id}:{league.id}")]
+        for league in leagues
+    ]
+    rows.append([InlineKeyboardButton(text="Назад", callback_data=f"template_back:{template_id}:{game}")])
+    rows.append([InlineKeyboardButton(text="Отмена", callback_data="template:cancel")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def tracking_actions_keyboard(items: list[TrackedItem]) -> InlineKeyboardMarkup:
     rows = []
     for item in items:

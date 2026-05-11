@@ -13,6 +13,9 @@ class LeagueService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
+    async def get_by_id(self, league_id: int) -> League | None:
+        return await self.session.scalar(select(League).where(League.id == league_id))
+
     async def get_or_create(self, name: str, realm: str = "poe2") -> League:
         league = await self.session.scalar(select(League).where(League.name == name, League.realm == realm))
         if league:

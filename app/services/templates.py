@@ -30,12 +30,22 @@ class TemplateService:
         )
         return list(result)
 
-    async def activate(self, user: User, template_group_id: int) -> TemplateActivationResult | None:
-        template = await self.session.scalar(
+    async def get_public_by_id(self, template_group_id: int) -> TemplateGroup | None:
+        return await self.session.scalar(
             select(TemplateGroup)
             .where(TemplateGroup.id == template_group_id, TemplateGroup.is_public.is_(True))
             .options(selectinload(TemplateGroup.items))
         )
+
+    async def activate(
+        self,
+        user: User,
+        template_group_id: int,
+        *,
+        league_name: str | None = None,
+        game: str | None = None,
+    ) -> TemplateActivationResult | None:
+        template = await self.get_public_by_id(template_group_id)
         if not template:
             return None
 
@@ -65,6 +75,8 @@ class TemplateService:
                 item_type=item.item_type,
                 target_price=threshold,
                 target_currency="ex",
+                league_name=league_name,
+                game=game,
             )
 
         after_count = await self.session.scalar(

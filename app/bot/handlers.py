@@ -19,6 +19,8 @@ from app.bot.keyboards import (
     league_keyboard,
     paused_alerts_keyboard,
     search_results_keyboard,
+    template_game_keyboard,
+    template_league_keyboard,
     templates_keyboard,
     threshold_currency_keyboard,
     tracking_actions_keyboard,
@@ -1206,23 +1208,105 @@ async def templates(message: Message) -> None:
     )
 
 
-@router.callback_query(F.data.startswith("template:"))
+@router.callback_query(F.data.regexp(r"^template:\d+$"))
 async def activate_template(callback: CallbackQuery) -> None:
     template_id = int(callback.data.split(":", 1)[1])
 
     async with session_scope() as session:
+        template = await TemplateService(session).get_public_by_id(template_id)
+
+    if not template:
+        await callback.answer("Шаблон не найден", show_alert=True)
+        return
+
+    await callback.message.edit_text(
+        f"Шаблон: {template.name}\n\n"
+        "Сначала выбери игру, для которой применить этот шаблон.",
+        reply_markup=template_game_keyboard(template.id),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("template_game:"))
+async def choose_template_game(callback: CallbackQuery) -> None:
+    _, template_id_raw, game = callback.data.split(":")
+    template_id = int(template_id_raw)
+
+    async with session_scope() as session:
+        leagues = await LeagueService(session).list_selection_options(game)
+        template = await TemplateService(session).get_public_by_id(template_id)
+
+    if not template:
+        await callback.answer("Шаблон не найден", show_alert=True)
+        return
+
+    await callback.message.edit_text(
+        f"Шаблон: {template.name}\n"
+        f"Игра: {'POE 2' if game == 'poe2' else 'POE 1'}\n\n"
+        "Теперь выбери лигу, в которую добавить watchers из шаблона.",
+        reply_markup=template_league_keyboard(template.id, leagues, game),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("template_back:"))
+async def template_back_to_game(callback: CallbackQuery) -> None:
+    _, template_id_raw, _game = callback.data.split(":")
+    template_id = int(template_id_raw)
+
+    async with session_scope() as session:
+        template = await TemplateService(session).get_public_by_id(template_id)
+
+    if not template:
+        await callback.answer("Шаблон не найден", show_alert=True)
+        return
+
+    await callback.message.edit_text(
+        f"Шаблон: {template.name}\n\n"
+        "Снова выбери игру, для которой применить этот шаблон.",
+        reply_markup=template_game_keyboard(template.id),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("template_league:"))
+async def activate_template_for_league(callback: CallbackQuery) -> None:
+    _, template_id_raw, league_id_raw = callback.data.split(":")
+    template_id = int(template_id_raw)
+    league_id = int(league_id_raw)
+
+    async with session_scope() as session:
         user = await ensure_user(session, callback.from_user.id, callback.from_user.username)
-        result = await TemplateService(session).activate(user=user, template_group_id=template_id)
+        league = await LeagueService(session).get_by_id(league_id)
+        if not league:
+            await callback.answer("Лига не найдена", show_alert=True)
+            return
+
+        result = await TemplateService(session).activate(
+            user=user,
+            template_group_id=template_id,
+            league_name=league.name,
+            game=league.realm,
+        )
 
     if not result:
         await callback.answer("Шаблон не найден", show_alert=True)
         return
 
-    await callback.message.answer(
+    game_label = "POE 2" if league.realm == "poe2" else "POE 1"
+    await callback.message.edit_text(
         f"Шаблон {result.template_name} подключен.\n"
+        f"Игра: {game_label}\n"
+        f"Лига: {league.name}\n"
         f"Новых или реактивированных трекингов: {result.created_count}."
     )
     await callback.answer("Шаблон подключен")
+
+
+@router.callback_query(F.data == "template:cancel")
+async def cancel_template_activation(callback: CallbackQuery) -> None:
+    await callback.message.edit_text("Ок, отменил подключение шаблона.")
+    await callback.answer("Отменено")
 
 
 @router.message(Command("settings"))
