@@ -82,8 +82,17 @@ def build_tracking_lines(item) -> list[str]:
 
 def build_tracking_list_text(items: list) -> str:
     lines = [f"Активный трекинг: {len(items)}"]
+    grouped: dict[tuple[str, str], list] = {}
     for item in items:
-        lines.append("\n".join(build_tracking_lines(item)))
+        game_label = "POE 2" if item.league and item.league.realm == "poe2" else "POE 1"
+        league_name = item.league.name if item.league else "Без лиги"
+        grouped.setdefault((game_label, league_name), []).append(item)
+
+    for (game_label, league_name), group_items in sorted(grouped.items(), key=lambda entry: (entry[0][0], entry[0][1])):
+        lines.append("")
+        lines.append(f"{game_label} / {league_name} — {len(group_items)}")
+        for item in group_items:
+            lines.append("\n".join(build_tracking_lines(item)))
     return "\n\n".join(lines)
 
 
