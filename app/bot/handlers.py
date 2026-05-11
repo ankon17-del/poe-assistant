@@ -12,6 +12,7 @@ from aiogram.types import CallbackQuery, Message
 from app.bot.dependencies import session_scope
 from app.bot.keyboards import (
     add_entry_keyboard,
+    account_keyboard,
     currency_presets_keyboard,
     duplicate_resolution_keyboard,
     game_keyboard,
@@ -22,10 +23,13 @@ from app.bot.keyboards import (
     threshold_currency_keyboard,
     tracking_actions_keyboard,
 )
+from app.models.enums import IntegrationType
 from app.models.league import League
 from app.services.economy import EconomyService
+from app.services.integrations import IntegrationService
 from app.services.item_catalog import ItemCatalogService
 from app.services.leagues import LeagueService
+from app.services.poe_oauth import PoeOAuthConfigError, PoeOAuthService
 from app.services.stats import StatsService
 from app.services.templates import TemplateService
 from app.services.tracking import TrackingService
@@ -93,6 +97,30 @@ def build_paused_alerts_text(items: list) -> str:
     lines.append("")
     lines.append("Здесь можно быстро вернуть alert в работу целиком, по игре или отключить его совсем.")
     return "\n\n".join(lines)
+
+
+def build_account_text(*, integration, oauth_config_error: str | None) -> str:
+    lines = ["PoE аккаунт:"]
+    if integration:
+        lines.append("Статус: подключён")
+        if integration.external_account_name:
+            lines.append(f"Аккаунт: {integration.external_account_name}")
+        if integration.scopes:
+            lines.append(f"Scopes: {integration.scopes}")
+    else:
+        lines.append("Статус: не подключён")
+
+    if oauth_config_error:
+        lines.append("")
+        lines.append(f"OAuth сейчас недоступен: {oauth_config_error}")
+    elif integration:
+        lines.append("")
+        lines.append("Можно обновить статус или отключить привязку ниже.")
+    else:
+        lines.append("")
+        lines.append("Нажми кнопку ниже, чтобы привязать аккаунт Path of Exile к Telegram.")
+
+    return "\n".join(lines)
 
 
 def build_economy_text(summaries: list, overview) -> str:
@@ -258,6 +286,24 @@ async def finish_wizard(
     await state.clear()
 
 
+async def load_account_panel(telegram_id: int, username: str | None) -> tuple[str, object]:
+    async with session_scope() as session:
+        user = await ensure_user(session, telegram_id, username)
+        integration = await IntegrationService(session).get_by_type(user, IntegrationType.poe_oauth)
+
+    oauth_service = PoeOAuthService()
+    connect_url: str | None = None
+    oauth_config_error: str | None = None
+    try:
+        connect_url = oauth_service.build_connect_url(telegram_id=telegram_id)
+    except PoeOAuthConfigError as exc:
+        oauth_config_error = str(exc)
+
+    text = build_account_text(integration=integration, oauth_config_error=oauth_config_error)
+    keyboard = account_keyboard(connect_url=connect_url, is_connected=integration is not None)
+    return text, keyboard
+
+
 async def begin_add_wizard(message: Message, state: FSMContext) -> None:
     await state.clear()
     await state.set_state(AddTrackingStates.choosing_mode)
@@ -355,6 +401,7 @@ async def start(message: Message) -> None:
         "Быстрый старт:\n"
         "/add\n"
         "/list\n"
+        "/account\n"
         "/alerts\n"
         "/economy\n"
         "/templates\n\n"
@@ -372,12 +419,19 @@ async def help_command(message: Message) -> None:
         "/add <trade_url>\n"
         "/remove <id> - отключить трекинг\n"
         "/list - список активного трекинга\n"
+        "/account - привязка PoE аккаунта и статус подключения\n"
         "/alerts - сработавшие price alerts и быстрый перезапуск\n"
         "/stats - статистика продаж\n"
         "/economy - курсы валют и активные currency alerts\n"
         "/templates - готовые наборы\n"
         "/settings - текущие настройки MVP"
     )
+
+
+@router.message(Command("account"))
+async def account(message: Message) -> None:
+    text, keyboard = await load_account_panel(message.from_user.id, message.from_user.username)
+    await message.answer(text, reply_markup=keyboard)
 
 
 @router.message(Command("add"))
@@ -1067,6 +1121,30 @@ async def remove_paused_alert_from_panel(callback: CallbackQuery) -> None:
     await callback.message.edit_text(build_paused_alerts_text(items), reply_markup=paused_alerts_keyboard(items))
 
 
+@router.callback_query(F.data == "account:refresh")
+async def refresh_account_panel(callback: CallbackQuery) -> None:
+    text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username)
+    await callback.answer("Статус обновлён")
+    if callback.message:
+        await callback.message.edit_text(text, reply_markup=keyboard)
+
+
+@router.callback_query(F.data == "account:disconnect")
+async def disconnect_account(callback: CallbackQuery) -> None:
+    async with session_scope() as session:
+        user = await ensure_user(session, callback.from_user.id, callback.from_user.username)
+        disconnected = await IntegrationService(session).disconnect(user, IntegrationType.poe_oauth)
+
+    if not disconnected:
+        await callback.answer("PoE аккаунт уже не подключён", show_alert=True)
+        return
+
+    text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username)
+    await callback.answer("PoE аккаунт отключён")
+    if callback.message:
+        await callback.message.edit_text(text, reply_markup=keyboard)
+
+
 @router.message(Command("stats"))
 async def stats(message: Message) -> None:
     async with session_scope() as session:
@@ -1149,4 +1227,10 @@ async def activate_template(callback: CallbackQuery) -> None:
 
 @router.message(Command("settings"))
 async def settings(message: Message) -> None:
-    await message.answer("Настройки MVP: лига по умолчанию берется из DEFAULT_LEAGUE_NAME.")
+    text, _ = await load_account_panel(message.from_user.id, message.from_user.username)
+    await message.answer(
+        "Настройки MVP:\n"
+        "Лига по умолчанию берётся из DEFAULT_LEAGUE_NAME.\n\n"
+        f"{text}\n\n"
+        "Для управления привязкой открой /account.",
+    )

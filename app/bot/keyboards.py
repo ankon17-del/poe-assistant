@@ -47,6 +47,16 @@ def paused_alerts_keyboard(items: list[TrackedItem]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def account_keyboard(connect_url: str | None, is_connected: bool) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if connect_url:
+        rows.append([InlineKeyboardButton(text="Подключить PoE аккаунт", url=connect_url)])
+    rows.append([InlineKeyboardButton(text="Обновить статус", callback_data="account:refresh")])
+    if is_connected:
+        rows.append([InlineKeyboardButton(text="Отключить аккаунт", callback_data="account:disconnect")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def add_entry_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[

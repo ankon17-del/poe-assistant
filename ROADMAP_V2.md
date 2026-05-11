@@ -52,6 +52,8 @@ Additional completed model upgrades:
 - `/add`
 - `/remove`
 - `/list`
+- `/alerts`
+- `/account`
 - `/stats`
 - `/economy`
 - `/templates`
@@ -122,10 +124,12 @@ Implemented:
 - callback flow
 - token storage
 - service token request flow
+- user-facing Telegram flow via `/account`
+- status refresh and disconnect actions in the bot
+- account status mirrored in `/settings`
 
 Missing:
 
-- user-facing Telegram flow for account linking
 - actual use of account scopes in product features
 
 ## Not Done Yet

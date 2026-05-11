@@ -5,7 +5,7 @@ import hashlib
 import secrets
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse, urlunparse
 
 import httpx
 
@@ -71,6 +71,23 @@ class PoeOAuthService:
             state=state,
             verifier=pkce.verifier,
             scopes=scope_string,
+        )
+
+    def build_connect_url(self, telegram_id: int, scopes: str | None = None) -> str:
+        self._require_client_configuration(require_secret=False)
+        parsed = urlparse(self.settings.poe_oauth_redirect_uri)
+        query = {"telegram_id": str(telegram_id)}
+        if scopes:
+            query["scopes"] = scopes
+        return urlunparse(
+            (
+                parsed.scheme,
+                parsed.netloc,
+                "/oauth/poe/connect",
+                "",
+                urlencode(query),
+                "",
+            )
         )
 
     async def exchange_authorization_code(

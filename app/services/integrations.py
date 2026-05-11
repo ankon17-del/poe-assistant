@@ -20,6 +20,15 @@ class IntegrationService:
             )
         )
 
+    async def disconnect(self, user: User, integration_type: IntegrationType) -> bool:
+        integration = await self.get_by_type(user=user, integration_type=integration_type)
+        if integration is None:
+            return False
+
+        await self.session.delete(integration)
+        await self.session.flush()
+        return True
+
     async def upsert_oauth_tokens(
         self,
         user: User,

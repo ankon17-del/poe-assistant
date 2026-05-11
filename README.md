@@ -6,7 +6,7 @@ Current implementation status and next priorities are tracked in [ROADMAP_V2.md]
 
 ## MVP Scope
 
-- Telegram bot with `/start`, `/help`, `/add`, `/remove`, `/list`, `/stats`, `/economy`, `/templates`, `/settings`.
+- Telegram bot with `/start`, `/help`, `/add`, `/remove`, `/list`, `/alerts`, `/account`, `/stats`, `/economy`, `/templates`, `/settings`.
 - League-first SQLAlchemy models.
 - Template packs generate independent tracking configs.
 - Integration and worker placeholders are isolated from bot handlers.
@@ -135,12 +135,13 @@ Then you can request a service token directly:
 python -m scripts.request_service_token
 ```
 
-For account scopes, the API exposes a minimal start/callback flow:
+For account scopes, the API exposes a minimal connect/callback flow:
 
-- `GET /oauth/poe/start?telegram_id=<id>&scopes=account:profile`
+- `GET /oauth/poe/connect?telegram_id=<id>&scopes=account:profile`
 - `GET /oauth/poe/callback?code=...&state=...`
 
 The callback stores tokens in `integrations` under `integration_type=poe_oauth`.
+The bot-side user flow is available through `/account` and mirrored in `/settings`.
 
 ## Architecture Rules
 
