@@ -1,11 +1,10 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.tracked_item import TrackedItem
 from app.models.template import TemplateGroup, UserTemplate
 from app.models.user import User
 from app.services.tracking import TrackingService
@@ -15,6 +14,9 @@ from app.services.tracking import TrackingService
 class TemplateActivationResult:
     template_name: str
     created_count: int
+    updated_count: int
+    created_items: list[str]
+    updated_items: list[str]
 
 
 class TemplateService:
@@ -82,16 +84,12 @@ class TemplateService:
         else:
             self.session.add(UserTemplate(user_id=user.id, template_group_id=template.id, enabled=True))
 
-        before_count = await self.session.scalar(
-            select(func.count()).select_from(TrackedItem).where(
-                TrackedItem.user_id == user.id,
-                TrackedItem.is_active.is_(True),
-            )
-        )
         tracking = TrackingService(self.session)
+        created_items: list[str] = []
+        updated_items: list[str] = []
         for item in template.items:
             threshold = Decimal(item.default_threshold) if item.default_threshold is not None else None
-            await tracking.add_item(
+            result = await tracking.add_item(
                 user=user,
                 item_name=item.item_name,
                 item_type=item.item_type,
@@ -100,13 +98,15 @@ class TemplateService:
                 league_name=league_name,
                 game=game,
             )
+            if result.action == "created":
+                created_items.append(result.item.item_name)
+            else:
+                updated_items.append(result.item.item_name)
 
-        after_count = await self.session.scalar(
-            select(func.count()).select_from(TrackedItem).where(
-                TrackedItem.user_id == user.id,
-                TrackedItem.is_active.is_(True),
-            )
+        return TemplateActivationResult(
+            template_name=template.name,
+            created_count=len(created_items),
+            updated_count=len(updated_items),
+            created_items=created_items,
+            updated_items=updated_items,
         )
-        created_count = max(0, (after_count or 0) - (before_count or 0))
-
-        return TemplateActivationResult(template_name=template.name, created_count=created_count)

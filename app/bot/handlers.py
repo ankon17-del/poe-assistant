@@ -149,6 +149,29 @@ def build_template_preview_text(template, game: str) -> str:
     return "\n".join(lines)
 
 
+def build_template_activation_text(result, league) -> str:
+    game_label = "POE 2" if league.realm == "poe2" else "POE 1"
+    lines = [
+        f"Шаблон {result.template_name} подключен.",
+        f"Игра: {game_label}",
+        f"Лига: {league.name}",
+        f"Создано watcher'ов: {result.created_count}",
+        f"Обновлено или реактивировано: {result.updated_count}",
+    ]
+
+    if result.created_items:
+        lines.append("")
+        lines.append("Созданы:")
+        lines.extend(f"- {item_name}" for item_name in result.created_items)
+
+    if result.updated_items:
+        lines.append("")
+        lines.append("Обновлены или реактивированы:")
+        lines.extend(f"- {item_name}" for item_name in result.updated_items)
+
+    return "\n".join(lines)
+
+
 def build_economy_text(summaries: list, overview) -> str:
     lines = ["Экономика:"]
     lines.append("")
@@ -1377,13 +1400,7 @@ async def activate_template_for_league(callback: CallbackQuery) -> None:
         await callback.answer("Шаблон не найден", show_alert=True)
         return
 
-    game_label = "POE 2" if league.realm == "poe2" else "POE 1"
-    await callback.message.edit_text(
-        f"Шаблон {result.template_name} подключен.\n"
-        f"Игра: {game_label}\n"
-        f"Лига: {league.name}\n"
-        f"Новых или реактивированных трекингов: {result.created_count}."
-    )
+    await callback.message.edit_text(build_template_activation_text(result, league))
     await callback.answer("Шаблон подключен")
 
 
