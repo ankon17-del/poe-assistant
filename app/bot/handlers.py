@@ -19,6 +19,7 @@ from app.bot.keyboards import (
     league_keyboard,
     paused_alerts_keyboard,
     search_results_keyboard,
+    template_browser_game_keyboard,
     template_game_keyboard,
     template_league_keyboard,
     templates_keyboard,
@@ -1196,16 +1197,61 @@ async def economy(message: Message) -> None:
 async def templates(message: Message) -> None:
     async with session_scope() as session:
         await ensure_user(session, message.from_user.id, message.from_user.username)
-        template_groups = await TemplateService(session).list_public()
-
-    if not template_groups:
-        await message.answer("Шаблонов пока нет. Сначала нужно выполнить seed шаблонов.")
-        return
 
     await message.answer(
-        "Доступные шаблоны:\nВыбери набор, и я добавлю его в твой трекинг.",
-        reply_markup=templates_keyboard(template_groups),
+        "Шаблоны:\nСначала выбери игру, и я покажу только релевантные наборы.",
+        reply_markup=template_browser_game_keyboard(),
     )
+
+
+@router.callback_query(F.data == "templates:choose_game")
+async def templates_choose_game(callback: CallbackQuery) -> None:
+    await callback.message.edit_text(
+        "Шаблоны:\nСнова выбери игру, и я покажу только релевантные наборы.",
+        reply_markup=template_browser_game_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("templates:game:"))
+async def templates_for_game(callback: CallbackQuery) -> None:
+    game = callback.data.rsplit(":", 1)[1]
+
+    async with session_scope() as session:
+        templates = await TemplateService(session).list_public_for_game(game)
+
+    if not templates:
+        await callback.answer("Для этой игры шаблонов пока нет", show_alert=True)
+        return
+
+    game_label = "POE 2" if game == "poe2" else "POE 1"
+    await callback.message.edit_text(
+        f"Шаблоны для {game_label}:\nВыбери набор, и я добавлю его в нужную лигу.",
+        reply_markup=templates_keyboard(templates, game=game),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("template_select:"))
+async def choose_template_from_game_list(callback: CallbackQuery) -> None:
+    _, game, template_id_raw = callback.data.split(":")
+    template_id = int(template_id_raw)
+
+    async with session_scope() as session:
+        leagues = await LeagueService(session).list_selection_options(game)
+        template = await TemplateService(session).get_public_by_id(template_id)
+
+    if not template:
+        await callback.answer("Шаблон не найден", show_alert=True)
+        return
+
+    await callback.message.edit_text(
+        f"Шаблон: {template.name}\n"
+        f"Игра: {'POE 2' if game == 'poe2' else 'POE 1'}\n\n"
+        "Теперь выбери лигу, в которую добавить watchers из шаблона.",
+        reply_markup=template_league_keyboard(template.id, leagues, game),
+    )
+    await callback.answer()
 
 
 @router.callback_query(F.data.regexp(r"^template:\d+$"))

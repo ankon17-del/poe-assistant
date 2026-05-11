@@ -18,6 +18,13 @@ class TemplateActivationResult:
 
 
 class TemplateService:
+    TEMPLATE_REALMS: dict[str, str] = {
+        "Currency Farming": "both",
+        "Essence Farming": "both",
+        "Boss Drops": "poe1",
+        "Scarab Market": "poe1",
+    }
+
     def __init__(self, session: AsyncSession):
         self.session = session
 
@@ -29,6 +36,18 @@ class TemplateService:
             .order_by(TemplateGroup.category, TemplateGroup.name)
         )
         return list(result)
+
+    async def list_public_for_game(self, game: str) -> list[TemplateGroup]:
+        templates = await self.list_public()
+        return [
+            template
+            for template in templates
+            if self.get_template_realm(template) in {game, "both"}
+        ]
+
+    @classmethod
+    def get_template_realm(cls, template: TemplateGroup) -> str:
+        return cls.TEMPLATE_REALMS.get(template.name, "both")
 
     async def get_public_by_id(self, template_group_id: int) -> TemplateGroup | None:
         return await self.session.scalar(

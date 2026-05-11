@@ -7,17 +7,30 @@ from app.models.template import TemplateGroup
 from app.models.tracked_item import TrackedItem
 
 
-def templates_keyboard(templates: list[TemplateGroup]) -> InlineKeyboardMarkup:
+def templates_keyboard(templates: list[TemplateGroup], game: str | None = None) -> InlineKeyboardMarkup:
     rows = [
         [
             InlineKeyboardButton(
                 text=f"{template.name} ({len(template.items)} шт.)",
-                callback_data=f"template:{template.id}",
+                callback_data=(f"template_select:{game}:{template.id}" if game else f"template:{template.id}"),
             )
         ]
         for template in templates
     ]
+    if game:
+        rows.append([InlineKeyboardButton(text="Назад", callback_data="templates:choose_game")])
+    rows.append([InlineKeyboardButton(text="Отмена", callback_data="template:cancel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def template_browser_game_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="POE 2", callback_data="templates:game:poe2")],
+            [InlineKeyboardButton(text="POE 1", callback_data="templates:game:poe1")],
+            [InlineKeyboardButton(text="Отмена", callback_data="template:cancel")],
+        ]
+    )
 
 
 def template_game_keyboard(template_id: int) -> InlineKeyboardMarkup:
