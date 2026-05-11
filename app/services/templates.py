@@ -20,7 +20,10 @@ class TemplateActivationResult:
 class TemplateService:
     TEMPLATE_REALMS: dict[str, str] = {
         "Currency Farming": "both",
-        "Essence Farming": "both",
+        "POE2 Starter Economy": "poe2",
+        "POE2 Exchange Watch": "poe2",
+        "POE1 Currency Farming": "poe1",
+        "Essence Farming": "poe1",
         "Boss Drops": "poe1",
         "Scarab Market": "poe1",
     }
@@ -93,7 +96,7 @@ class TemplateService:
                 item_name=item.item_name,
                 item_type=item.item_type,
                 target_price=threshold,
-                target_currency="ex",
+                target_currency=item.default_target_currency or "ex",
                 league_name=league_name,
                 game=game,
             )

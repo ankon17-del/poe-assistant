@@ -8,10 +8,15 @@ from app.models.tracked_item import TrackedItem
 
 
 def templates_keyboard(templates: list[TemplateGroup], game: str | None = None) -> InlineKeyboardMarkup:
+    game_label = "POE 2" if game == "poe2" else "POE 1" if game == "poe1" else None
     rows = [
         [
             InlineKeyboardButton(
-                text=f"{template.name} ({len(template.items)} шт.)",
+                text=(
+                    f"{template.name} ({len(template.items)} шт.)"
+                    if not game_label
+                    else f"{template.name} ({len(template.items)} шт.) · {game_label}"
+                ),
                 callback_data=(f"template_select:{game}:{template.id}" if game else f"template:{template.id}"),
             )
         ]

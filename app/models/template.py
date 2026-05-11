@@ -29,6 +29,7 @@ class TemplateItem(Base):
     item_name: Mapped[str] = mapped_column(String(255), index=True)
     item_type: Mapped[str] = mapped_column(String(64), default="item")
     default_threshold: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    default_target_currency: Mapped[str] = mapped_column(String(16), default="ex")
     priority: Mapped[int] = mapped_column(default=100)
 
     template_group = relationship("TemplateGroup", back_populates="items")
@@ -45,4 +46,3 @@ class UserTemplate(Base):
 
     user = relationship("User", back_populates="user_templates")
     template_group = relationship("TemplateGroup", back_populates="user_templates")
-
