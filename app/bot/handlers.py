@@ -255,6 +255,7 @@ def build_recommendations_text(
                 f"Для комфорта: {', '.join(recommendation.comfort_upgrades)}",
                 f"Для урона: {', '.join(recommendation.damage_upgrades)}",
                 f"Закрыть по защите: {', '.join(recommendation.defense_fixes)}",
+                f"Если хочется похожее, но по-другому: {recommendation.alternative_hint}",
                 f"Сильные стороны: {', '.join(recommendation.strengths)}",
                 f"Смотри в экипировке: {', '.join(recommendation.gear_focus)}",
                 f"Осторожно: {', '.join(recommendation.cautions)}",

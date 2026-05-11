@@ -19,6 +19,7 @@ class BuildRecommendation:
     comfort_upgrades: tuple[str, ...]
     damage_upgrades: tuple[str, ...]
     defense_fixes: tuple[str, ...]
+    alternative_hint: str
     summary: str
 
 
@@ -39,6 +40,7 @@ class BuildService:
             comfort_upgrades=("больше attack speed", "quiver с quality-of-life статами", "move speed на ботинках"),
             damage_upgrades=("лучший ele bow", "crit multi", "дополнительные projectile scaling слои"),
             defense_fixes=("spell suppression cap", "evasion", "life на редких слотах"),
+            alternative_hint="Если хочется похожий темп, но больше универсальности, смотри в сторону Hexblast Mines Trickster.",
             summary="Классический быстрый маппер для POE1, если хочется фармить карты и валюту в темпе.",
         ),
         BuildRecommendation(
@@ -56,6 +58,7 @@ class BuildService:
             comfort_upgrades=("faster detonation feel", "mana comfort", "movement quality-of-life"),
             damage_upgrades=("gem levels", "crit multi", "better curse / exposure setup"),
             defense_fixes=("evasion or ES слой", "spell suppression", "хаос-рез, если проседает"),
+            alternative_hint="Если хочется спокойнее и толще, но с меньшим микро, посмотри на Righteous Fire Chieftain.",
             summary="Хороший универсальный выбор, если нужен баланс между фармом и убийством боссов.",
         ),
         BuildRecommendation(
@@ -73,6 +76,7 @@ class BuildService:
             comfort_upgrades=("movement speed", "radius / clear comfort", "recovery feel"),
             damage_upgrades=("burning damage", "gem levels", "dot multi where applicable"),
             defense_fixes=("life pool", "armour", "max res и sustain под RF"),
+            alternative_hint="Если хочется быстрее закрывать карты ценой меньшей жирности, можно смотреть Lightning Arrow Deadeye.",
             summary="Надёжный старт, если хочется играть спокойно, толстым персонажем и без суеты.",
         ),
         BuildRecommendation(
@@ -90,6 +94,7 @@ class BuildService:
             comfort_upgrades=("быстрый cast feel", "удобный movement setup", "качество life/mana flask слоя"),
             damage_upgrades=("lightning scaling", "crit / shock value", "лучший weapon/focus"),
             defense_fixes=("energy shield или life слой", "резисты", "позиционная выживаемость"),
+            alternative_hint="Если хочется такой же стартовой надёжности, но спокойнее по механике, рядом стоит Minion Infernalist.",
             summary="Очень крепкий POE2-старт, если нужен универсальный caster для раннего фарма.",
         ),
         BuildRecommendation(
@@ -107,6 +112,7 @@ class BuildService:
             comfort_upgrades=("качество мувмента", "ресурс на sustain", "упрощение clear-loop"),
             damage_upgrades=("лучшее оружие", "cold scaling", "crit / penetration где доступно"),
             defense_fixes=("evade / armour слои", "life", "не проседать по резистам"),
+            alternative_hint="Если хочется меньше риска и больше контроля по темпу, смотри Spark Stormweaver или Titan Slam Warrior.",
             summary="Если хочется динамичного POE2-мели билда для темпового фарма и маппинга.",
         ),
         BuildRecommendation(
@@ -124,6 +130,7 @@ class BuildService:
             comfort_upgrades=("удобный summon loop", "ресурс под поддерживающие кнопки", "плавность clear"),
             damage_upgrades=("minion levels", "миньон-урон", "лучший support setup"),
             defense_fixes=("щит/броня по ситуации", "life or ES", "резисты и recovery"),
+            alternative_hint="Если хочется активнее и быстрее чистить карты, но всё ещё универсально, посмотри Spark Stormweaver.",
             summary="Хороший выбор, если хочется безопасного старта и меньше давления по механике.",
         ),
         BuildRecommendation(
@@ -141,6 +148,7 @@ class BuildService:
             comfort_upgrades=("speed/feel в ротации", "ресурс на sustain", "чистка packs без просадки"),
             damage_upgrades=("chaos / poison scaling", "лучший bow", "single-target multipliers"),
             defense_fixes=("позиционная защита", "life", "не проседать по элементальным резистам"),
+            alternative_hint="Если хочется пожирнее и прямолинейнее под жирные цели, рядом Titan Slam Warrior.",
             summary="Подходит, если хочется уже не только фармить, но и уверенно давить более жирные цели.",
         ),
         BuildRecommendation(
@@ -158,6 +166,7 @@ class BuildService:
             comfort_upgrades=("ускорение ротации", "ресурс на sustain", "качество передвижения"),
             damage_upgrades=("weapon DPS", "physical scaling", "heavy hit multipliers"),
             defense_fixes=("armour", "life", "анти-ваншот слои"),
+            alternative_hint="Если хочется больше темпа и меньше тяжёлого melee-feel, попробуй Ice Strike Monk или Gas Arrow Huntress.",
             summary="Крепкий путь, если нужен плотный персонаж для более спокойного, но уверенного прогресса.",
         ),
     )
