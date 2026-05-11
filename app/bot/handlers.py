@@ -299,6 +299,8 @@ def build_recommendations_text(
                 f"Атлас / направление фарма: {', '.join(recommendation.atlas_focus)}",
                 f"Что этим билдом фармить: {', '.join(recommendation.farm_mechanics)}",
                 f"Пантеон / заметки по защите: {', '.join(recommendation.pantheon_or_defense_notes)}",
+                "Эндгейм-чеклист по слотам:",
+                *[f"  - {entry}" for entry in recommendation.endgame_slot_checklist],
                 f"Эндгейм-цели для билда: {', '.join(recommendation.endgame_goals)}",
                 f"Когда билд уже считается собранным для эндгейма: {', '.join(recommendation.endgame_milestones)}",
                 f"Дорогие chase-апгрейды: {', '.join(recommendation.chase_upgrades)}",
