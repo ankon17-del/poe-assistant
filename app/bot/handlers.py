@@ -15,6 +15,7 @@ from app.bot.keyboards import (
     account_keyboard,
     build_budget_keyboard,
     build_game_keyboard,
+    build_goal_keyboard,
     build_playstyle_keyboard,
     currency_presets_keyboard,
     duplicate_resolution_keyboard,
@@ -193,10 +194,21 @@ def build_assistant_intro_text() -> str:
     )
 
 
-def build_budget_prompt_text(game: str) -> str:
+def build_goal_prompt_text(game: str) -> str:
     game_label = BuildService.game_label(game)
     return (
         f"Build assistant · {game_label}\n\n"
+        "Какая у тебя сейчас главная цель?"
+    )
+
+
+def build_budget_prompt_text(game: str, goal: str) -> str:
+    game_label = BuildService.game_label(game)
+    goal_label = BuildService.goal_label(goal)
+    return (
+        f"Build assistant · {game_label}\n\n"
+        f"Цель: {goal_label}\n"
+        "\n"
         "Теперь выбери бюджетный уровень. Это не точная валюта, а скорее стадия готовности:\n"
         "- стартовый\n"
         "- средний\n"
@@ -204,11 +216,13 @@ def build_budget_prompt_text(game: str) -> str:
     )
 
 
-def build_playstyle_prompt_text(game: str, budget_tier: str) -> str:
+def build_playstyle_prompt_text(game: str, goal: str, budget_tier: str) -> str:
     game_label = BuildService.game_label(game)
+    goal_label = BuildService.goal_label(goal)
     budget_label = BuildService.budget_label(budget_tier)
     return (
         f"Build assistant · {game_label}\n"
+        f"Цель: {goal_label}\n"
         f"Бюджет: {budget_label}\n\n"
         "Какой стиль тебе ближе?"
     )
@@ -217,11 +231,13 @@ def build_playstyle_prompt_text(game: str, budget_tier: str) -> str:
 def build_recommendations_text(
     *,
     game: str,
+    goal: str,
     budget_tier: str,
     playstyle: str,
     recommendations: list[BuildRecommendation],
 ) -> str:
     game_label = BuildService.game_label(game)
+    goal_label = BuildService.goal_label(goal)
     budget_label = BuildService.budget_label(budget_tier)
     playstyle_label = BuildService.playstyle_label(playstyle)
 
@@ -229,6 +245,7 @@ def build_recommendations_text(
         "Build assistant:",
         "",
         f"Игра: {game_label}",
+        f"Цель: {goal_label}",
         f"Бюджет: {budget_label}",
         f"Стиль: {playstyle_label}",
     ]
@@ -1346,45 +1363,68 @@ async def builds_back_to_game(callback: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("builds:game:"))
-async def builds_choose_budget(callback: CallbackQuery) -> None:
+async def builds_choose_goal(callback: CallbackQuery) -> None:
     game = callback.data.rsplit(":", 1)[1]
     if callback.message:
-        await callback.message.edit_text(build_budget_prompt_text(game), reply_markup=build_budget_keyboard(game))
+        await callback.message.edit_text(build_goal_prompt_text(game), reply_markup=build_goal_keyboard(game))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("builds:back:goal:"))
+async def builds_back_to_goal(callback: CallbackQuery) -> None:
+    game = callback.data.rsplit(":", 1)[1]
+    if callback.message:
+        await callback.message.edit_text(build_goal_prompt_text(game), reply_markup=build_goal_keyboard(game))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("builds:goal:"))
+async def builds_choose_budget(callback: CallbackQuery) -> None:
+    _, _, game, goal = callback.data.split(":")
+    if callback.message:
+        await callback.message.edit_text(
+            build_budget_prompt_text(game, goal),
+            reply_markup=build_budget_keyboard(game, goal),
+        )
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("builds:back:budget:"))
 async def builds_back_to_budget(callback: CallbackQuery) -> None:
-    game = callback.data.rsplit(":", 1)[1]
+    _, _, _, game, goal = callback.data.split(":")
     if callback.message:
-        await callback.message.edit_text(build_budget_prompt_text(game), reply_markup=build_budget_keyboard(game))
+        await callback.message.edit_text(
+            build_budget_prompt_text(game, goal),
+            reply_markup=build_budget_keyboard(game, goal),
+        )
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("builds:budget:"))
 async def builds_choose_playstyle(callback: CallbackQuery) -> None:
-    _, _, game, budget_tier = callback.data.split(":")
+    _, _, game, goal, budget_tier = callback.data.split(":")
     if callback.message:
         await callback.message.edit_text(
-            build_playstyle_prompt_text(game, budget_tier),
-            reply_markup=build_playstyle_keyboard(game, budget_tier),
+            build_playstyle_prompt_text(game, goal, budget_tier),
+            reply_markup=build_playstyle_keyboard(game, goal, budget_tier),
         )
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("builds:playstyle:"))
 async def builds_show_recommendations(callback: CallbackQuery) -> None:
-    _, _, game, budget_tier, playstyle = callback.data.split(":")
-    recommendations = BuildService().recommend(game=game, budget_tier=budget_tier, playstyle=playstyle)
+    _, _, game, goal, budget_tier, playstyle = callback.data.split(":")
+    recommendations = BuildService().recommend(game=game, goal=goal, budget_tier=budget_tier, playstyle=playstyle)
     if callback.message:
         await callback.message.edit_text(
             build_recommendations_text(
                 game=game,
+                goal=goal,
                 budget_tier=budget_tier,
                 playstyle=playstyle,
                 recommendations=recommendations,
             ),
-            reply_markup=build_playstyle_keyboard(game, budget_tier),
+            reply_markup=build_playstyle_keyboard(game, goal, budget_tier),
         )
     await callback.answer()
 

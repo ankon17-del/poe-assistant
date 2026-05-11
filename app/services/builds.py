@@ -8,6 +8,7 @@ class BuildRecommendation:
     title: str
     game: str
     archetype: str
+    goals: tuple[str, ...]
     class_name: str
     budget_tier: str
     playstyles: tuple[str, ...]
@@ -29,6 +30,7 @@ class BuildService:
             title="Lightning Arrow Deadeye",
             game="poe1",
             archetype="mapper",
+            goals=("league_start", "currency_farm"),
             class_name="Ranger / Deadeye",
             budget_tier="mid",
             playstyles=("speed", "allround"),
@@ -47,6 +49,7 @@ class BuildService:
             title="Hexblast Mines Trickster",
             game="poe1",
             archetype="allround",
+            goals=("boss_kill", "comfortable_progress"),
             class_name="Shadow / Trickster",
             budget_tier="mid",
             playstyles=("boss", "allround"),
@@ -65,6 +68,7 @@ class BuildService:
             title="Righteous Fire Chieftain",
             game="poe1",
             archetype="tank",
+            goals=("league_start", "comfortable_progress"),
             class_name="Marauder / Chieftain",
             budget_tier="starter",
             playstyles=("safe", "allround"),
@@ -83,6 +87,7 @@ class BuildService:
             title="Spark Stormweaver",
             game="poe2",
             archetype="allround",
+            goals=("league_start", "currency_farm", "comfortable_progress"),
             class_name="Sorceress / Stormweaver",
             budget_tier="starter",
             playstyles=("allround", "speed"),
@@ -101,6 +106,7 @@ class BuildService:
             title="Ice Strike Monk",
             game="poe2",
             archetype="mapper",
+            goals=("currency_farm", "comfortable_progress"),
             class_name="Monk",
             budget_tier="mid",
             playstyles=("speed", "allround"),
@@ -119,6 +125,7 @@ class BuildService:
             title="Minion Infernalist",
             game="poe2",
             archetype="safe",
+            goals=("league_start", "comfortable_progress"),
             class_name="Witch / Infernalist",
             budget_tier="starter",
             playstyles=("safe", "allround"),
@@ -137,6 +144,7 @@ class BuildService:
             title="Gas Arrow Huntress",
             game="poe2",
             archetype="boss",
+            goals=("boss_kill", "currency_farm"),
             class_name="Huntress",
             budget_tier="mid",
             playstyles=("boss", "allround"),
@@ -155,6 +163,7 @@ class BuildService:
             title="Titan Slam Warrior",
             game="poe2",
             archetype="tank",
+            goals=("boss_kill", "comfortable_progress"),
             class_name="Warrior / Titan",
             budget_tier="mid",
             playstyles=("safe", "boss"),
@@ -175,6 +184,7 @@ class BuildService:
         self,
         *,
         game: str,
+        goal: str,
         budget_tier: str,
         playstyle: str,
         limit: int = 3,
@@ -185,6 +195,8 @@ class BuildService:
                 continue
 
             score = 0
+            if goal in build.goals:
+                score += 5
             if build.budget_tier == budget_tier:
                 score += 3
             elif budget_tier == "starter" and build.budget_tier == "mid":
@@ -225,3 +237,12 @@ class BuildService:
             "boss": "босcинг",
             "allround": "универсальный",
         }.get(playstyle, playstyle)
+
+    @staticmethod
+    def goal_label(goal: str) -> str:
+        return {
+            "league_start": "старт лиги",
+            "currency_farm": "фарм валюты",
+            "comfortable_progress": "комфортный прогресс",
+            "boss_kill": "убийство боссов",
+        }.get(goal, goal)

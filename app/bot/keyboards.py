@@ -114,25 +114,37 @@ def build_game_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def build_budget_keyboard(game: str) -> InlineKeyboardMarkup:
+def build_goal_keyboard(game: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Стартовый", callback_data=f"builds:budget:{game}:starter")],
-            [InlineKeyboardButton(text="Средний", callback_data=f"builds:budget:{game}:mid")],
-            [InlineKeyboardButton(text="Высокий", callback_data=f"builds:budget:{game}:high")],
+            [InlineKeyboardButton(text="Старт лиги", callback_data=f"builds:goal:{game}:league_start")],
+            [InlineKeyboardButton(text="Фарм валюты", callback_data=f"builds:goal:{game}:currency_farm")],
+            [InlineKeyboardButton(text="Комфортный прогресс", callback_data=f"builds:goal:{game}:comfortable_progress")],
+            [InlineKeyboardButton(text="Убить боссов", callback_data=f"builds:goal:{game}:boss_kill")],
             [InlineKeyboardButton(text="Назад", callback_data="builds:back:game")],
         ]
     )
 
 
-def build_playstyle_keyboard(game: str, budget_tier: str) -> InlineKeyboardMarkup:
+def build_budget_keyboard(game: str, goal: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Быстрый фарм", callback_data=f"builds:playstyle:{game}:{budget_tier}:speed")],
-            [InlineKeyboardButton(text="Спокойный / живучий", callback_data=f"builds:playstyle:{game}:{budget_tier}:safe")],
-            [InlineKeyboardButton(text="Боссинг", callback_data=f"builds:playstyle:{game}:{budget_tier}:boss")],
-            [InlineKeyboardButton(text="Универсальный", callback_data=f"builds:playstyle:{game}:{budget_tier}:allround")],
-            [InlineKeyboardButton(text="Назад", callback_data=f"builds:back:budget:{game}")],
+            [InlineKeyboardButton(text="Стартовый", callback_data=f"builds:budget:{game}:{goal}:starter")],
+            [InlineKeyboardButton(text="Средний", callback_data=f"builds:budget:{game}:{goal}:mid")],
+            [InlineKeyboardButton(text="Высокий", callback_data=f"builds:budget:{game}:{goal}:high")],
+            [InlineKeyboardButton(text="Назад", callback_data=f"builds:back:goal:{game}")],
+        ]
+    )
+
+
+def build_playstyle_keyboard(game: str, goal: str, budget_tier: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Быстрый фарм", callback_data=f"builds:playstyle:{game}:{goal}:{budget_tier}:speed")],
+            [InlineKeyboardButton(text="Спокойный / живучий", callback_data=f"builds:playstyle:{game}:{goal}:{budget_tier}:safe")],
+            [InlineKeyboardButton(text="Боссинг", callback_data=f"builds:playstyle:{game}:{goal}:{budget_tier}:boss")],
+            [InlineKeyboardButton(text="Универсальный", callback_data=f"builds:playstyle:{game}:{goal}:{budget_tier}:allround")],
+            [InlineKeyboardButton(text="Назад", callback_data=f"builds:back:budget:{game}:{goal}")],
         ]
     )
 
