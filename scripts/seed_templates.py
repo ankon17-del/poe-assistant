@@ -15,7 +15,7 @@ DEFAULT_TEMPLATES = [
         "description": "Baseline currency watchers for either game.",
         "category": "currency",
         "items": [
-            ("Divine Orb", "currency", Decimal("15")),
+            ("Divine Orb", "currency", Decimal("15"), "chaos"),
             ("Exalted Orb", "currency", Decimal("8"), "chaos"),
         ],
     },
