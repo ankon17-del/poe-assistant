@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from urllib.parse import quote_plus
+
+
+def _search_url(query: str) -> str:
+    return f"https://duckduckgo.com/?q={quote_plus(query)}"
 
 
 @dataclass(frozen=True)
@@ -82,6 +87,11 @@ class BuildService:
             defense_fixes=("spell suppression cap", "evasion", "life на редких слотах"),
             alternative_hint="Если хочется похожий темп, но больше универсальности, смотри в сторону Hexblast Mines Trickster.",
             summary="Классический быстрый маппер для POE1, если хочется фармить карты и валюту в темпе.",
+            planner_url=_search_url("site:poe-vault.com Lightning Arrow Deadeye passive skill tree gems links"),
+            guide_url=_search_url("site:poe-vault.com Lightning Arrow Deadeye build guide"),
+            tree_url=_search_url("site:poe-vault.com Lightning Arrow Deadeye passive skill tree gems links"),
+            atlas_url="https://www.poe-vault.com/guides/atlas-passive-skill-tree-strategies",
+            source_note="Для Lightning Arrow пока даю рабочие внешние entry points: guide и tree через стабильный поиск по PoE Vault, а atlas — через визуальный Atlas guide.",
         ),
         BuildRecommendation(
             title="Hexblast Mines Trickster",
@@ -186,6 +196,11 @@ class BuildService:
             defense_fixes=("life pool", "armour", "max res и sustain под RF"),
             alternative_hint="Если хочется быстрее закрывать карты ценой меньшей жирности, можно смотреть Lightning Arrow Deadeye.",
             summary="Надёжный старт, если хочется играть спокойно, толстым персонажем и без суеты.",
+            planner_url=_search_url("site:poe-vault.com Righteous Fire Chieftain passive skill tree gems links"),
+            guide_url=_search_url("site:poe-vault.com Righteous Fire Chieftain build guide"),
+            tree_url=_search_url("site:poe-vault.com Righteous Fire Chieftain passive skill tree gems links"),
+            atlas_url="https://www.poe-vault.com/guides/atlas-passive-skill-tree-strategies",
+            source_note="Для Righteous Fire пока даю рабочие внешние entry points: guide и tree через стабильный поиск по PoE Vault, плюс визуальный Atlas guide.",
         ),
         BuildRecommendation(
             title="Spark Stormweaver",
@@ -290,6 +305,11 @@ class BuildService:
             defense_fixes=("evade / armour слои", "life", "не проседать по резистам"),
             alternative_hint="Если хочется меньше риска и больше контроля по темпу, смотри Spark Stormweaver или Titan Slam Warrior.",
             summary="Если хочется динамичного POE2-мели билда для темпового фарма и маппинга.",
+            planner_url=_search_url("site:maxroll.gg/poe2 Ice Strike Monk planner"),
+            guide_url=_search_url("site:mobalytics.gg/poe-2 Ice Strike Monk build guide"),
+            tree_url=_search_url("site:mobalytics.gg/poe-2 Ice Strike Monk passive tree planner"),
+            atlas_url=_search_url("site:maxroll.gg/poe2 atlas guide"),
+            source_note="Для Ice Strike Monk пока даю рабочие entry points через стабильный поиск по Mobalytics и Maxroll: guide, tree/planner и визуальный atlas reference.",
         ),
         BuildRecommendation(
             title="Minion Infernalist",
@@ -393,6 +413,11 @@ class BuildService:
             defense_fixes=("позиционная защита", "life", "не проседать по элементальным резистам"),
             alternative_hint="Если хочется пожирнее и прямолинейнее под жирные цели, рядом Titan Slam Warrior.",
             summary="Подходит, если хочется уже не только фармить, но и уверенно давить более жирные цели.",
+            planner_url=_search_url("site:maxroll.gg/poe2 Gas Arrow Huntress planner"),
+            guide_url=_search_url("site:mobalytics.gg/poe-2 Gas Arrow Huntress build guide"),
+            tree_url=_search_url("site:mobalytics.gg/poe-2 Gas Arrow Huntress passive tree planner"),
+            atlas_url=_search_url("site:maxroll.gg/poe2 atlas guide"),
+            source_note="Для Gas Arrow Huntress пока даю рабочие entry points через стабильный поиск по Mobalytics и Maxroll: guide, tree/planner и визуальный atlas reference.",
         ),
         BuildRecommendation(
             title="Titan Slam Warrior",
@@ -430,6 +455,11 @@ class BuildService:
             defense_fixes=("armour", "life", "анти-ваншот слои"),
             alternative_hint="Если хочется больше темпа и меньше тяжёлого melee-feel, попробуй Ice Strike Monk или Gas Arrow Huntress.",
             summary="Крепкий путь, если нужен плотный персонаж для более спокойного, но уверенного прогресса.",
+            planner_url=_search_url("site:maxroll.gg/poe2 Titan Slam Warrior planner"),
+            guide_url=_search_url("site:mobalytics.gg/poe-2 Titan Slam Warrior build guide"),
+            tree_url=_search_url("site:mobalytics.gg/poe-2 Titan Slam Warrior passive tree planner"),
+            atlas_url=_search_url("site:maxroll.gg/poe2 atlas guide"),
+            source_note="Для Titan Slam Warrior пока даю рабочие entry points через стабильный поиск по Mobalytics и Maxroll: guide, tree/planner и визуальный atlas reference.",
         ),
     )
 

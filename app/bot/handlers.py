@@ -331,6 +331,7 @@ def build_recommendation_detail_text(
         f"Класс: {recommendation.class_name}",
         f"Ядро: {recommendation.core_skill}",
         recommendation.summary,
+        *(["Источник/референсы: " + recommendation.source_note] if recommendation.source_note else []),
         f"Примерный бюджет: {recommendation.budget_estimate}",
         f"Покупать в первую очередь: {', '.join(recommendation.buy_priority)}",
         f"Какие статы добирать: {', '.join(recommendation.stat_targets)}",
