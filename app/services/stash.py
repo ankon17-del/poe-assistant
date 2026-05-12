@@ -30,7 +30,136 @@ class StashPanelSummary:
     next_steps: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class StashGuide:
+    slug: str
+    title: str
+    summary: str
+    sections: tuple[tuple[str, tuple[str, ...]], ...]
+
+
 class StashService:
+    _guides: tuple[StashGuide, ...] = (
+        StashGuide(
+            slug="triage",
+            title="Быстрый stash triage",
+            summary="Короткий маршрут, если у тебя 5-10 минут и хочется быстро понять, где в тайниках лежат самые лёгкие деньги.",
+            sections=(
+                (
+                    "1. С чего начать",
+                    (
+                        "Открой currency / fragments / scarabs / essences раньше всего: там чаще всего лежит самая ликвидная масса.",
+                        "Сначала смотри не на редкость предмета, а на объём: большие стаки часто дают больше диванов, чем один красивый уник.",
+                        "Отдельно проверь вкладки с invitations, fragments, breach/legion/expedition currency и scarabs.",
+                    ),
+                ),
+                (
+                    "2. Что считать быстрыми деньгами",
+                    (
+                        "Всё, что имеет понятную рыночную ликвидность: div/ex/chaos, scarabs, essences, catalysts, oils, invitations, breachstones.",
+                        "Если предмет не требует долгого price check и его легко искать по exact name — это хороший кандидат на быструю продажу.",
+                        "Когда не хватает валюты на апгрейд, сначала выноси в продажу именно такие вещи, а не редкие шлемы 'на потом'.",
+                    ),
+                ),
+                (
+                    "3. Где чаще всего лежит мусор",
+                    (
+                        "Широкие dump tabs с rares, униками 'на всякий случай' и полусобранными craft bases.",
+                        "Старые механики, которые ты больше не фармишь: splinters, low-tier maps, random fossils/резонаторы маленькими пачками.",
+                        "Вкладки, где у тебя нет явного плана: если вещь не идёт в билд, не продаётся быстро и не копится под цель — это кандидат на разбор.",
+                    ),
+                ),
+            ),
+        ),
+        StashGuide(
+            slug="liquid",
+            title="Что продавать быстрее всего",
+            summary="Если нужна быстрая ликвидация, вот какой порядок обычно даёт самый понятный кэш-аут.",
+            sections=(
+                (
+                    "1. Топ ликвидности",
+                    (
+                        "Валюта, scarabs, essences, oils, catalysts, invitations и boss fragments обычно продаются быстрее всего.",
+                        "Следом идут карты/логбуки/эмблемы/бичстоуны и другие понятные endgame-consumables.",
+                        "Если у тебя много мелких стаков, собирай их в более крупные — так их проще продать и глазами, и рынку.",
+                    ),
+                ),
+                (
+                    "2. Что продавать после этого",
+                    (
+                        "Сильные bases, востребованные уникалки, jewels с понятными модами и gear, который легко объяснить названием + 2-3 аффиксами.",
+                        "Всё, что требует долгого craft-context, продавай только если ты уверен в цене; иначе это уже не 'быстрые деньги'.",
+                    ),
+                ),
+                (
+                    "3. Чего не ждать от быстрой продажи",
+                    (
+                        "Сомнительные rares без очевидного use-case.",
+                        "Уникалки без meta-спроса просто потому, что они красивые или когда-то были дорогими.",
+                        "Редкие базы без influence/fracture/явного крафтового потенциала.",
+                    ),
+                ),
+            ),
+        ),
+        StashGuide(
+            slug="uniques",
+            title="Как проверять unique tabs",
+            summary="Большинство unique tabs — это смесь настоящей ценности и огромного количества 'приятного мусора'.",
+            sections=(
+                (
+                    "1. Что искать глазами",
+                    (
+                        "Meta-defining uniques, chase belts/rings/amulets, build-enabling jewels и вещи, которые ты сам часто видишь в гайдах.",
+                        "Double-corrupt / good rolls / high ilvl / rare variants обычно важнее, чем сам факт 'о, это unique'.",
+                        "Если уник ищется exact name и у него есть 1-2 критичных roll ranges — это сильный кандидат на отдельный price check.",
+                    ),
+                ),
+                (
+                    "2. Как не тратить время впустую",
+                    (
+                        "Не price-check'ай подряд всю вкладку. Сначала вытащи только те uniques, которые реально известны как useful или expensive.",
+                        "Смотри на повторы: если у тебя 6 копий среднего уника, это редко скрытое сокровище.",
+                    ),
+                ),
+                (
+                    "3. Когда unique лучше оставить",
+                    (
+                        "Если он дешёвый, но точно идёт в один из твоих билдов или шаблонов фарма.",
+                        "Если это piece для будущего chase-upgrade path, а не случайная находка.",
+                    ),
+                ),
+            ),
+        ),
+        StashGuide(
+            slug="currency",
+            title="Как смотреть currency / fragments",
+            summary="Самый практичный stash-layer: именно здесь чаще всего лежит основная ликвидность account'а.",
+            sections=(
+                (
+                    "1. Проверка валюты",
+                    (
+                        "Начни с div/ex/chaos и дальше смотри bulk-consumables: essences, catalysts, oils, scarabs, invitations.",
+                        "Если рынок живой, bulk-ресурсы часто монетизируются быстрее и тише, чем редкий gear.",
+                    ),
+                ),
+                (
+                    "2. Fragments и boss pieces",
+                    (
+                        "Собери полный список invitations, fragments, breachstones, emblems, logbooks и похожих endgame pieces.",
+                        "Такие вещи удобно продавать сериями: 5-10+ одинаковых предметов уже ощущаются как товар, а не мусор.",
+                    ),
+                ),
+                (
+                    "3. Когда стоит придержать",
+                    (
+                        "Если ты сам прямо сейчас фармишь эту механику и она конвертируется в доход выше мгновенной продажи.",
+                        "Если предметы копятся под крупный batch-sale, а не лежат бесцельно.",
+                    ),
+                ),
+            ),
+        ),
+    )
+
     def __init__(self, session: AsyncSession):
         self.session = session
         self.settings = get_settings()
@@ -123,3 +252,14 @@ class StashService:
             upcoming_insights=upcoming_insights,
             next_steps=next_steps,
         )
+
+    @classmethod
+    def list_guides(cls) -> tuple[StashGuide, ...]:
+        return cls._guides
+
+    @classmethod
+    def get_guide(cls, slug: str) -> StashGuide | None:
+        for guide in cls._guides:
+            if guide.slug == slug:
+                return guide
+        return None

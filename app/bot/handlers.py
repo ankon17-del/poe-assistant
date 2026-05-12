@@ -26,6 +26,7 @@ from app.bot.keyboards import (
     paused_alerts_keyboard,
     search_results_keyboard,
     stash_keyboard,
+    stash_guide_keyboard,
     template_browser_game_keyboard,
     template_game_keyboard,
     template_league_keyboard,
@@ -180,6 +181,21 @@ def build_stash_text(summary) -> str:
 
     lines.append("")
     lines.append("Phase 6 уже начата: UX и сервисный фундамент готовы, дальше нам нужны account-data и stash-scopes.")
+    return "\n".join(lines)
+
+
+def build_stash_guide_text(guide) -> str:
+    lines = [
+        f"Stash assistant · {guide.title}",
+        "",
+        guide.summary,
+    ]
+    for section_title, bullets in guide.sections:
+        lines.append("")
+        lines.append(section_title)
+        lines.extend(f"- {bullet}" for bullet in bullets)
+    lines.append("")
+    lines.append("Это ручной playbook: уже полезно без OAuth, а потом мы наложим на него живой stash-scan и автоматические инсайты.")
     return "\n".join(lines)
 
 
@@ -1509,6 +1525,26 @@ async def refresh_stash_panel(callback: CallbackQuery) -> None:
     await callback.answer("Stash-панель обновлена")
     if callback.message:
         await callback.message.edit_text(text, reply_markup=keyboard)
+
+
+@router.callback_query(F.data == "stash:back:panel")
+async def stash_back_to_panel(callback: CallbackQuery) -> None:
+    text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username)
+    await callback.answer()
+    if callback.message:
+        await callback.message.edit_text(text, reply_markup=keyboard)
+
+
+@router.callback_query(F.data.startswith("stash:guide:"))
+async def stash_open_guide(callback: CallbackQuery) -> None:
+    slug = callback.data.rsplit(":", 1)[1]
+    guide = StashService.get_guide(slug)
+    if guide is None:
+        await callback.answer("Этот stash-playbook не найден", show_alert=True)
+        return
+    await callback.answer()
+    if callback.message:
+        await callback.message.edit_text(build_stash_guide_text(guide), reply_markup=stash_guide_keyboard())
 
 
 @router.callback_query(F.data == "stash:account")

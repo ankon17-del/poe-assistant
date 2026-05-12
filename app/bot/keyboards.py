@@ -110,9 +110,22 @@ def stash_keyboard(connect_url: str | None, account_connected: bool) -> InlineKe
     rows: list[list[InlineKeyboardButton]] = []
     if connect_url and not account_connected:
         rows.append([InlineKeyboardButton(text="Подключить PoE аккаунт", url=connect_url)])
+    rows.append([InlineKeyboardButton(text="Быстрый stash triage", callback_data="stash:guide:triage")])
+    rows.append([InlineKeyboardButton(text="Что продавать быстрее всего", callback_data="stash:guide:liquid")])
+    rows.append([InlineKeyboardButton(text="Как проверять unique tabs", callback_data="stash:guide:uniques")])
+    rows.append([InlineKeyboardButton(text="Как смотреть currency / fragments", callback_data="stash:guide:currency")])
     rows.append([InlineKeyboardButton(text="Обновить stash-анализ", callback_data="stash:refresh")])
     rows.append([InlineKeyboardButton(text="Открыть панель аккаунта", callback_data="stash:account")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def stash_guide_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Назад к stash panel", callback_data="stash:back:panel")],
+            [InlineKeyboardButton(text="Открыть панель аккаунта", callback_data="stash:account")],
+        ]
+    )
 
 
 def build_game_keyboard() -> InlineKeyboardMarkup:
