@@ -345,6 +345,10 @@ def build_recommendation_detail_text(
         f"Если хочется похожее, но по-другому: {recommendation.alternative_hint}",
     ]
 
+    if recommendation.gear_sheet:
+        lines.append("Gear sheet по слотам:")
+        lines.extend(f"  - {entry}" for entry in recommendation.gear_sheet)
+
     if recommendation.market_targets:
         lines.append("Что искать на трейде:")
         lines.extend(f"  - {entry}" for entry in recommendation.market_targets)

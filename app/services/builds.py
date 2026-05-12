@@ -34,6 +34,7 @@ class BuildRecommendation:
     alternative_hint: str
     summary: str
     market_targets: tuple[str, ...] = ()
+    gear_sheet: tuple[str, ...] = ()
     avoid_warnings: tuple[str, ...] = ()
     planner_url: str | None = None
     guide_url: str | None = None
@@ -122,6 +123,15 @@ class BuildService:
                 "Shield/Off-hand: spell damage, spell crit, life or ES, suppress or resist suffixes",
                 "Amulet: +1 chaos gems or global crit multi, life/ES, attributes if tree is tight",
                 "Boots/Gloves/Helm: spell suppression, life or ES, chaos res, move speed on boots",
+            ),
+            gear_sheet=(
+                "Weapon: rare wand/sceptre with +1 chaos or spell gems, spell crit, cast speed, chaos/spell damage",
+                "Off-hand: shield or focus with spell crit, life or ES, resist suffixes, suppression if possible",
+                "Helmet: life/ES base, suppression, chaos res, open suffixes to finish res caps cleanly",
+                "Body: 6-link defensive chest first; avoid greedy pure-DPS swap before your mine feel is stable",
+                "Gloves/Boots: suppression, move speed on boots, life/ES, chaos res or attributes",
+                "Rings/Amulet/Belt: gem levels or crit multi on amulet, mana comfort where needed, life/ES, capped resistances",
+                "Jewels/Flasks: crit multi, spell damage, mine damage, with diamond + quartz/defensive flask setup",
             ),
             avoid_warnings=(
                 "Map mods: reroll no/low mana sustain, reduced recovery, awkward curse interaction if your setup leans on it",
@@ -213,6 +223,15 @@ class BuildService:
                 "Rings/Amulet: mana regen, mana on kill or sustain, cast speed, lightning scaling",
                 "Body/Helm/Boots: life or ES, resistances, movement speed, free suffixes for fixing stats",
             ),
+            gear_sheet=(
+                "Weapon: caster wand with spell damage, lightning to spells, cast speed, +spell or lightning levels",
+                "Focus: cast speed, spell crit or sustain, life/ES leaning base, resist suffixes to keep gearing flexible",
+                "Helmet: life or ES, resistances, optionally offensive suffix if sustain is already solved",
+                "Body: defensive ES/life chest first; upgrade to stronger endgame piece after cast feel and mana are clean",
+                "Gloves/Boots: move speed, cast feel, resistances, life/ES; do not leave yourself glassy for tiny DPS gains",
+                "Rings/Amulet/Belt: mana sustain, cast speed, lightning scaling, attributes and resist coverage",
+                "Jewels/Charms: cast speed, lightning damage, crit/shock scaling, and utility that keeps uptime smooth",
+            ),
             avoid_warnings=(
                 "Map mods: no regen / harsh mana sustain mods и тяжёлые lightning-res stacks ощущаются плохо",
                 "Content: если билд ещё сырой, неприятны very tight boss arenas без места для Spark uptime",
@@ -302,6 +321,14 @@ class BuildService:
                 "Helmet: minion or spirit-supporting base, life or ES, resistances, ideally one offensive suffix",
                 "Rings/Amulet/Belt: spirit or mana economy, minion stats, life/ES, capped resistances",
                 "Boots/Gloves/Body: survivability first — life/ES, resistances, move speed, then minion utility",
+            ),
+            gear_sheet=(
+                "Weapon/Focus: +minion levels, spirit utility, minion damage, but keep enough defensive suffixes to not fall over yourself",
+                "Helmet: minion-supporting or spirit-friendly slot with life/ES, resistances, one offensive line if free",
+                "Body: defensive chest first; this build wants you alive while minions do the heavy lifting",
+                "Gloves/Boots: resistances, move speed, life/ES, then minion utility or convenience mods",
+                "Rings/Amulet/Belt: spirit economy, minion stats, life/ES, attributes and clean res coverage",
+                "Jewels/Charms: minion offense, spirit comfort, utility that smooths long boss fights and crowded maps",
             ),
             avoid_warnings=(
                 "Map mods: жёсткие anti-recovery / anti-minion uptime сочетания и хаотичный arena-pressure могут быть неприятны",
