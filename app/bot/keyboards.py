@@ -163,7 +163,8 @@ def build_results_keyboard(
         if recommendation.guide_url:
             rows.append([InlineKeyboardButton(text="Открыть Guide", url=recommendation.guide_url)])
         if recommendation.tree_url:
-            rows.append([InlineKeyboardButton(text="Открыть Tree", url=recommendation.tree_url)])
+            tree_label = "Открыть Tree в Planner" if recommendation.tree_url == recommendation.planner_url else "Открыть Tree"
+            rows.append([InlineKeyboardButton(text=tree_label, url=recommendation.tree_url)])
     rows.append([InlineKeyboardButton(text="Назад к стилю", callback_data=f"builds:back:playstyle:{game}:{goal}:{budget_tier}")])
     rows.append([InlineKeyboardButton(text="Назад к бюджету", callback_data=f"builds:back:budget:{game}:{goal}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
