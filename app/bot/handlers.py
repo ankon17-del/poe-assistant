@@ -25,6 +25,7 @@ from app.bot.keyboards import (
     league_keyboard,
     paused_alerts_keyboard,
     search_results_keyboard,
+    stash_keyboard,
     template_browser_game_keyboard,
     template_game_keyboard,
     template_league_keyboard,
@@ -42,6 +43,7 @@ from app.services.item_catalog import ItemCatalogService
 from app.services.leagues import LeagueService
 from app.services.poe_oauth import PoeOAuthConfigError, PoeOAuthService
 from app.services.stats import StatsService
+from app.services.stash import StashService
 from app.services.templates import TemplateService
 from app.services.tracking import TrackingService
 from app.services.users import UserService
@@ -140,6 +142,44 @@ def build_account_text(*, integration, oauth_config_error: str | None) -> str:
         lines.append("")
         lines.append("Нажми кнопку ниже, чтобы привязать аккаунт Path of Exile к Telegram.")
 
+    return "\n".join(lines)
+
+
+def build_stash_text(summary) -> str:
+    lines = ["Stash assistant:", ""]
+
+    if summary.account_connected:
+        if summary.account_name:
+            lines.append(f"PoE аккаунт: подключён ({summary.account_name})")
+        else:
+            lines.append("PoE аккаунт: подключён")
+    else:
+        lines.append("PoE аккаунт: пока не подключён")
+
+    if summary.approved_scopes:
+        lines.append(f"Scopes: {' '.join(summary.approved_scopes)}")
+
+    if summary.oauth_blocker:
+        lines.append(f"Блокер OAuth: {summary.oauth_blocker}")
+
+    lines.append("")
+    lines.append("Статус готовности:")
+    for item in summary.statuses:
+        lines.append(f"- {item.title}: {item.status}")
+        lines.append(f"  {item.detail}")
+
+    lines.append("")
+    lines.append("Что здесь появится:")
+    for insight in summary.upcoming_insights:
+        lines.append(f"- {insight}")
+
+    lines.append("")
+    lines.append("Следующие шаги:")
+    for step in summary.next_steps:
+        lines.append(f"- {step}")
+
+    lines.append("")
+    lines.append("Phase 6 уже начата: UX и сервисный фундамент готовы, дальше нам нужны account-data и stash-scopes.")
     return "\n".join(lines)
 
 
@@ -591,6 +631,22 @@ async def load_account_panel(telegram_id: int, username: str | None) -> tuple[st
     return text, keyboard
 
 
+async def load_stash_panel(telegram_id: int, username: str | None) -> tuple[str, object]:
+    async with session_scope() as session:
+        user = await ensure_user(session, telegram_id, username)
+        summary = await StashService(session).get_panel_summary(user)
+
+    connect_url = None
+    if summary.oauth_available and not summary.account_connected:
+        oauth_service = PoeOAuthService()
+        try:
+            connect_url = oauth_service.build_connect_url(telegram_id=telegram_id)
+        except PoeOAuthConfigError:
+            connect_url = None
+
+    return build_stash_text(summary), stash_keyboard(connect_url=connect_url, account_connected=summary.account_connected)
+
+
 async def begin_add_wizard(message: Message, state: FSMContext) -> None:
     await state.clear()
     await state.set_state(AddTrackingStates.choosing_mode)
@@ -690,6 +746,7 @@ async def start(message: Message) -> None:
         "/builds\n"
         "/list\n"
         "/account\n"
+        "/stash\n"
         "/alerts\n"
         "/economy\n"
         "/templates\n\n"
@@ -709,6 +766,7 @@ async def help_command(message: Message) -> None:
         "/remove <id> - отключить трекинг\n"
         "/list - список активного трекинга\n"
         "/account - привязка PoE аккаунта и статус подключения\n"
+        "/stash - панель stash-анализа и готовность к реальному скану\n"
         "/alerts - сработавшие price alerts и быстрый перезапуск\n"
         "/stats - статистика продаж\n"
         "/economy - курсы валют и активные currency alerts\n"
@@ -720,6 +778,12 @@ async def help_command(message: Message) -> None:
 @router.message(Command("account"))
 async def account(message: Message) -> None:
     text, keyboard = await load_account_panel(message.from_user.id, message.from_user.username)
+    await message.answer(text, reply_markup=keyboard)
+
+
+@router.message(Command("stash"))
+async def stash(message: Message) -> None:
+    text, keyboard = await load_stash_panel(message.from_user.id, message.from_user.username)
     await message.answer(text, reply_markup=keyboard)
 
 
@@ -1435,6 +1499,22 @@ async def disconnect_account(callback: CallbackQuery) -> None:
 
     text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username)
     await callback.answer("PoE аккаунт отключён")
+    if callback.message:
+        await callback.message.edit_text(text, reply_markup=keyboard)
+
+
+@router.callback_query(F.data == "stash:refresh")
+async def refresh_stash_panel(callback: CallbackQuery) -> None:
+    text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username)
+    await callback.answer("Stash-панель обновлена")
+    if callback.message:
+        await callback.message.edit_text(text, reply_markup=keyboard)
+
+
+@router.callback_query(F.data == "stash:account")
+async def stash_open_account_panel(callback: CallbackQuery) -> None:
+    text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username)
+    await callback.answer("Открываю панель аккаунта")
     if callback.message:
         await callback.message.edit_text(text, reply_markup=keyboard)
 

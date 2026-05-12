@@ -106,6 +106,15 @@ def account_keyboard(connect_url: str | None, is_connected: bool) -> InlineKeybo
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def stash_keyboard(connect_url: str | None, account_connected: bool) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if connect_url and not account_connected:
+        rows.append([InlineKeyboardButton(text="Подключить PoE аккаунт", url=connect_url)])
+    rows.append([InlineKeyboardButton(text="Обновить stash-анализ", callback_data="stash:refresh")])
+    rows.append([InlineKeyboardButton(text="Открыть панель аккаунта", callback_data="stash:account")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def build_game_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
