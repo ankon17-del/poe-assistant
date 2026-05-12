@@ -310,6 +310,9 @@ def build_recommendations_text(
                 lines.extend(f"  - {entry}" for entry in recommendation.market_targets)
             else:
                 lines.append(f"На каких слотах и архетипе шмоток фокус: {', '.join(recommendation.gear_focus)}")
+            if recommendation.avoid_warnings:
+                lines.append("Чего избегать:")
+                lines.extend(f"  - {entry}" for entry in recommendation.avoid_warnings)
             if recommendation.planner_url or recommendation.guide_url or recommendation.tree_url:
                 lines.insert(lines.index(f"Покупать в первую очередь: {', '.join(recommendation.buy_priority)}"), "Ресурсы: planner / guide / tree кнопками ниже.")
         else:

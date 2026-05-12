@@ -34,6 +34,7 @@ class BuildRecommendation:
     alternative_hint: str
     summary: str
     market_targets: tuple[str, ...] = ()
+    avoid_warnings: tuple[str, ...] = ()
     planner_url: str | None = None
     guide_url: str | None = None
     tree_url: str | None = None
@@ -121,6 +122,11 @@ class BuildService:
                 "Amulet: +1 chaos gems or global crit multi, life/ES, attributes if tree is tight",
                 "Boots/Gloves/Helm: spell suppression, life or ES, chaos res, move speed on boots",
             ),
+            avoid_warnings=(
+                "Map mods: reroll no/low mana sustain, reduced recovery, awkward curse interaction if your setup leans on it",
+                "Content: не лучший билд для полностью ленивого zoom-mapping — любит паузы под mine setup",
+                "Сырой этап: пока нет нормального throw speed и gem levels, не жми самые жирные invitations",
+            ),
             planner_url="https://www.poe-vault.com/guides/hexblast-miner-saboteur-build-guide",
             guide_url="https://www.youtube.com/watch?v=8XHF0seCGZQ",
             tree_url="https://www.poe-vault.com/guides/hexblast-miner-saboteur-passive-skill-tree-gems-links",
@@ -205,6 +211,11 @@ class BuildService:
                 "Rings/Amulet: mana regen, mana on kill or sustain, cast speed, lightning scaling",
                 "Body/Helm/Boots: life or ES, resistances, movement speed, free suffixes for fixing stats",
             ),
+            avoid_warnings=(
+                "Map mods: no regen / harsh mana sustain mods и тяжёлые lightning-res stacks ощущаются плохо",
+                "Content: если билд ещё сырой, неприятны very tight boss arenas без места для Spark uptime",
+                "Сырой этап: не жертвуй защитой ради одного cast speed — без нормального sustain билд быстро становится стеклянным",
+            ),
             planner_url="https://maxroll.gg/poe2/planner/xpedn0v4",
             guide_url="https://mobalytics.gg/poe-2/builds/animeprincess-spark-stormweaver",
             tree_url="https://maxroll.gg/poe2/planner/xpedn0v4",
@@ -288,6 +299,11 @@ class BuildService:
                 "Helmet: minion or spirit-supporting base, life or ES, resistances, ideally one offensive suffix",
                 "Rings/Amulet/Belt: spirit or mana economy, minion stats, life/ES, capped resistances",
                 "Boots/Gloves/Body: survivability first — life/ES, resistances, move speed, then minion utility",
+            ),
+            avoid_warnings=(
+                "Map mods: жёсткие anti-recovery / anti-minion uptime сочетания и хаотичный arena-pressure могут быть неприятны",
+                "Content: очень быстрый timed clear билд чувствует хуже, чем стабильные плотные encounter'ы",
+                "Сырой этап: пока не закрыт spirit/setup и базовая защита, не лезь в слишком плотный high-tier burst-контент",
             ),
             planner_url="https://maxroll.gg/poe2/planner/fjuim01r",
             guide_url="https://mobalytics.gg/poe-2/builds/life-stacker-infernalist-kripp",
