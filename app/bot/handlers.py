@@ -294,27 +294,24 @@ def build_recommendations_text(
                     f"Покупать в первую очередь: {', '.join(recommendation.buy_priority)}",
                     f"Какие статы добирать: {', '.join(recommendation.stat_targets)}",
                     f"Первые апгрейды: {', '.join(recommendation.first_upgrades)}",
-                    f"Для комфорта: {', '.join(recommendation.comfort_upgrades)}",
-                    f"Для урона: {', '.join(recommendation.damage_upgrades)}",
-                    f"Закрыть по защите: {', '.join(recommendation.defense_fixes)}",
                     f"Дерево / приоритеты прокачки: {', '.join(recommendation.tree_focus)}",
                     f"Атлас / направление фарма: {', '.join(recommendation.atlas_focus)}",
                     f"Что этим билдом фармить: {', '.join(recommendation.farm_mechanics)}",
-                    f"Пантеон / заметки по защите: {', '.join(recommendation.pantheon_or_defense_notes)}",
                     "Эндгейм-чеклист по слотам:",
                     *[f"  - {entry}" for entry in recommendation.endgame_slot_checklist],
                     f"Эндгейм-цели для билда: {', '.join(recommendation.endgame_goals)}",
-                    f"Когда билд уже считается собранным для эндгейма: {', '.join(recommendation.endgame_milestones)}",
                     f"Дорогие chase-апгрейды: {', '.join(recommendation.chase_upgrades)}",
-                    f"На каких слотах и архетипе шмоток фокус: {', '.join(recommendation.gear_focus)}",
                     f"Осторожно: {', '.join(recommendation.cautions)}",
                     f"Если хочется похожее, но по-другому: {recommendation.alternative_hint}",
                 ]
             )
+            if recommendation.market_targets:
+                lines.append("Что искать на трейде:")
+                lines.extend(f"  - {entry}" for entry in recommendation.market_targets)
+            else:
+                lines.append(f"На каких слотах и архетипе шмоток фокус: {', '.join(recommendation.gear_focus)}")
             if recommendation.planner_url or recommendation.guide_url or recommendation.tree_url:
                 lines.insert(lines.index(f"Покупать в первую очередь: {', '.join(recommendation.buy_priority)}"), "Ресурсы: planner / guide / tree кнопками ниже.")
-            if recommendation.source_note:
-                lines.append(f"Источник: {recommendation.source_note}")
         else:
             lines.extend(
                 [

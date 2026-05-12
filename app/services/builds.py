@@ -33,6 +33,7 @@ class BuildRecommendation:
     defense_fixes: tuple[str, ...]
     alternative_hint: str
     summary: str
+    market_targets: tuple[str, ...] = ()
     planner_url: str | None = None
     guide_url: str | None = None
     tree_url: str | None = None
@@ -114,6 +115,12 @@ class BuildService:
             defense_fixes=("evasion or ES слой", "spell suppression", "хаос-рез, если проседает"),
             alternative_hint="Если хочется спокойнее и толще, но с меньшим микро, посмотри на Righteous Fire Chieftain.",
             summary="Хороший универсальный выбор, если нужен баланс между фармом и убийством боссов.",
+            market_targets=(
+                "Wand/Sceptre: +1 chaos or spell gems, crit chance for spells, crit multi, cast speed",
+                "Shield/Off-hand: spell damage, spell crit, life or ES, suppress or resist suffixes",
+                "Amulet: +1 chaos gems or global crit multi, life/ES, attributes if tree is tight",
+                "Boots/Gloves/Helm: spell suppression, life or ES, chaos res, move speed on boots",
+            ),
             planner_url="https://www.poe-vault.com/guides/hexblast-miner-saboteur-build-guide",
             guide_url="https://www.youtube.com/watch?v=8XHF0seCGZQ",
             tree_url="https://www.poe-vault.com/guides/hexblast-miner-saboteur-passive-skill-tree-gems-links",
@@ -192,6 +199,12 @@ class BuildService:
             defense_fixes=("energy shield или life слой", "резисты", "позиционная выживаемость"),
             alternative_hint="Если хочется такой же стартовой надёжности, но спокойнее по механике, рядом стоит Minion Infernalist.",
             summary="Очень крепкий POE2-старт, если нужен универсальный caster для раннего фарма.",
+            market_targets=(
+                "Wand: spell damage, lightning damage to spells, cast speed, +spell or lightning levels",
+                "Focus: cast speed, crit for spells or mana sustain, resist suffixes, defensive base",
+                "Rings/Amulet: mana regen, mana on kill or sustain, cast speed, lightning scaling",
+                "Body/Helm/Boots: life or ES, resistances, movement speed, free suffixes for fixing stats",
+            ),
             planner_url="https://maxroll.gg/poe2/planner/xpedn0v4",
             guide_url="https://mobalytics.gg/poe-2/builds/animeprincess-spark-stormweaver",
             tree_url="https://maxroll.gg/poe2/planner/xpedn0v4",
@@ -270,6 +283,12 @@ class BuildService:
             defense_fixes=("щит/броня по ситуации", "life or ES", "резисты и recovery"),
             alternative_hint="Если хочется активнее и быстрее чистить карты, но всё ещё универсально, посмотри Spark Stormweaver.",
             summary="Хороший выбор, если хочется безопасного старта и меньше давления по механике.",
+            market_targets=(
+                "Wand/Focus: +minion levels, spirit utility, minion damage, defensive suffixes",
+                "Helmet: minion or spirit-supporting base, life or ES, resistances, ideally one offensive suffix",
+                "Rings/Amulet/Belt: spirit or mana economy, minion stats, life/ES, capped resistances",
+                "Boots/Gloves/Body: survivability first — life/ES, resistances, move speed, then minion utility",
+            ),
             planner_url="https://maxroll.gg/poe2/planner/fjuim01r",
             guide_url="https://mobalytics.gg/poe-2/builds/life-stacker-infernalist-kripp",
             tree_url="https://maxroll.gg/poe2/planner/fjuim01r",
