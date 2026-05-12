@@ -150,10 +150,33 @@ def build_playstyle_keyboard(game: str, goal: str, budget_tier: str) -> InlineKe
     )
 
 
-def build_results_keyboard(
+def build_recommendation_list_keyboard(
     game: str,
     goal: str,
     budget_tier: str,
+    playstyle: str,
+    recommendations: list[BuildRecommendation],
+) -> InlineKeyboardMarkup:
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=recommendation.title,
+                callback_data=f"builds:detail:{game}:{goal}:{budget_tier}:{playstyle}:{index}",
+            )
+        ]
+        for index, recommendation in enumerate(recommendations)
+    ]
+    rows.append([InlineKeyboardButton(text="Назад к стилю", callback_data=f"builds:back:playstyle:{game}:{goal}:{budget_tier}")])
+    rows.append([InlineKeyboardButton(text="Назад к бюджету", callback_data=f"builds:back:budget:{game}:{goal}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_detail_keyboard(
+    game: str,
+    goal: str,
+    budget_tier: str,
+    playstyle: str,
+    recommendation_index: int,
     recommendation: BuildRecommendation | None,
 ) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
@@ -165,6 +188,15 @@ def build_results_keyboard(
         if recommendation.tree_url:
             tree_label = "Открыть Tree в Planner" if recommendation.tree_url == recommendation.planner_url else "Открыть Tree"
             rows.append([InlineKeyboardButton(text=tree_label, url=recommendation.tree_url)])
+        if recommendation.atlas_url:
+            if recommendation.atlas_url == recommendation.guide_url:
+                atlas_label = "Открыть Atlas в Guide"
+            elif recommendation.atlas_url == recommendation.planner_url or recommendation.atlas_url == recommendation.tree_url:
+                atlas_label = "Открыть Atlas в Planner"
+            else:
+                atlas_label = "Открыть Atlas"
+            rows.append([InlineKeyboardButton(text=atlas_label, url=recommendation.atlas_url)])
+    rows.append([InlineKeyboardButton(text="Назад к подборке", callback_data=f"builds:back:list:{game}:{goal}:{budget_tier}:{playstyle}")])
     rows.append([InlineKeyboardButton(text="Назад к стилю", callback_data=f"builds:back:playstyle:{game}:{goal}:{budget_tier}")])
     rows.append([InlineKeyboardButton(text="Назад к бюджету", callback_data=f"builds:back:budget:{game}:{goal}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)

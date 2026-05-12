@@ -38,6 +38,7 @@ class BuildRecommendation:
     planner_url: str | None = None
     guide_url: str | None = None
     tree_url: str | None = None
+    atlas_url: str | None = None
     source_note: str | None = None
 
 
@@ -130,6 +131,7 @@ class BuildService:
             planner_url="https://www.poe-vault.com/guides/hexblast-miner-saboteur-build-guide",
             guide_url="https://www.youtube.com/watch?v=8XHF0seCGZQ",
             tree_url="https://www.poe-vault.com/guides/hexblast-miner-saboteur-passive-skill-tree-gems-links",
+            atlas_url="https://www.poe-vault.com/guides/atlas-passive-skill-tree-strategies",
             source_note="PoE1-референс пока community-sourced и может отставать от текущего баланса, но даёт реальную пассивку, гемы и gear-скелет.",
         ),
         BuildRecommendation(
@@ -219,6 +221,7 @@ class BuildService:
             planner_url="https://maxroll.gg/poe2/planner/xpedn0v4",
             guide_url="https://mobalytics.gg/poe-2/builds/animeprincess-spark-stormweaver",
             tree_url="https://maxroll.gg/poe2/planner/xpedn0v4",
+            atlas_url="https://mobalytics.gg/poe-2/builds/animeprincess-spark-stormweaver",
             source_note="Guide теперь ведёт на стабильный endgame-разбор, а tree — прямо в planner с визуальным пассивным деревом и gear layout.",
         ),
         BuildRecommendation(
@@ -308,6 +311,7 @@ class BuildService:
             planner_url="https://maxroll.gg/poe2/planner/fjuim01r",
             guide_url="https://mobalytics.gg/poe-2/builds/life-stacker-infernalist-kripp",
             tree_url="https://maxroll.gg/poe2/planner/fjuim01r",
+            atlas_url="https://mobalytics.gg/poe-2/builds/life-stacker-infernalist-kripp",
             source_note="Guide ведёт на стабильный endgame build page, а tree — в planner, где уже можно глазами смотреть дерево и slot layout.",
         ),
         BuildRecommendation(

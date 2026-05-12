@@ -14,10 +14,11 @@ from app.bot.keyboards import (
     add_entry_keyboard,
     account_keyboard,
     build_budget_keyboard,
+    build_detail_keyboard,
     build_game_keyboard,
     build_goal_keyboard,
     build_playstyle_keyboard,
-    build_results_keyboard,
+    build_recommendation_list_keyboard,
     currency_presets_keyboard,
     duplicate_resolution_keyboard,
     game_keyboard,
@@ -229,7 +230,7 @@ def build_playstyle_prompt_text(game: str, goal: str, budget_tier: str) -> str:
     )
 
 
-def build_recommendations_text(
+def build_recommendations_overview_text(
     *,
     game: str,
     goal: str,
@@ -281,54 +282,83 @@ def build_recommendations_text(
         ]
     )
 
+    lines.extend(["", "Подходящие варианты:"])
     for index, recommendation in enumerate(recommendations, start=1):
-        if index == 1:
-            lines.extend(
-                [
-                    "",
-                    f"{index}. {recommendation.title}",
-                    f"Класс: {recommendation.class_name}",
-                    f"Ядро: {recommendation.core_skill}",
-                    recommendation.summary,
-                    f"Примерный бюджет: {recommendation.budget_estimate}",
-                    f"Покупать в первую очередь: {', '.join(recommendation.buy_priority)}",
-                    f"Какие статы добирать: {', '.join(recommendation.stat_targets)}",
-                    f"Первые апгрейды: {', '.join(recommendation.first_upgrades)}",
-                    f"Дерево / приоритеты прокачки: {', '.join(recommendation.tree_focus)}",
-                    f"Атлас / направление фарма: {', '.join(recommendation.atlas_focus)}",
-                    f"Что этим билдом фармить: {', '.join(recommendation.farm_mechanics)}",
-                    "Эндгейм-чеклист по слотам:",
-                    *[f"  - {entry}" for entry in recommendation.endgame_slot_checklist],
-                    f"Эндгейм-цели для билда: {', '.join(recommendation.endgame_goals)}",
-                    f"Дорогие chase-апгрейды: {', '.join(recommendation.chase_upgrades)}",
-                    f"Осторожно: {', '.join(recommendation.cautions)}",
-                    f"Если хочется похожее, но по-другому: {recommendation.alternative_hint}",
-                ]
-            )
-            if recommendation.market_targets:
-                lines.append("Что искать на трейде:")
-                lines.extend(f"  - {entry}" for entry in recommendation.market_targets)
-            else:
-                lines.append(f"На каких слотах и архетипе шмоток фокус: {', '.join(recommendation.gear_focus)}")
-            if recommendation.avoid_warnings:
-                lines.append("Чего избегать:")
-                lines.extend(f"  - {entry}" for entry in recommendation.avoid_warnings)
-            if recommendation.planner_url or recommendation.guide_url or recommendation.tree_url:
-                lines.insert(lines.index(f"Покупать в первую очередь: {', '.join(recommendation.buy_priority)}"), "Ресурсы: planner / guide / tree кнопками ниже.")
-        else:
-            lines.extend(
-                [
-                    "",
-                    f"{index}. {recommendation.title}",
-                    f"Класс: {recommendation.class_name}",
-                    f"Ядро: {recommendation.core_skill}",
-                    f"Бюджет: {recommendation.budget_estimate}",
-                    f"Фарм-контур: {', '.join(recommendation.farm_mechanics)}",
-                    f"Эндгейм-фокус: {', '.join(recommendation.endgame_goals)}",
-                    f"Что купить сначала: {', '.join(recommendation.buy_priority)}",
-                    f"Если брать как альтернативу: {recommendation.alternative_hint}",
-                ]
-            )
+        lines.extend(
+            [
+                "",
+                f"{index}. {recommendation.title}",
+                f"Класс: {recommendation.class_name}",
+                f"Ядро: {recommendation.core_skill}",
+                recommendation.summary,
+                f"Бюджет: {recommendation.budget_estimate}",
+                f"Эндгейм-фокус: {', '.join(recommendation.endgame_goals)}",
+            ]
+        )
+
+    lines.extend(
+        [
+            "",
+            "Нажми на билд ниже, и я открою подробный разбор со слотами, trade-targets и кнопками на planner / guide / tree / atlas.",
+        ]
+    )
+
+    return "\n".join(lines)
+
+
+def build_recommendation_detail_text(
+    *,
+    game: str,
+    goal: str,
+    budget_tier: str,
+    playstyle: str,
+    recommendation: BuildRecommendation,
+) -> str:
+    game_label = BuildService.game_label(game)
+    goal_label = BuildService.goal_label(goal)
+    budget_label = BuildService.budget_label(budget_tier)
+    playstyle_label = BuildService.playstyle_label(playstyle)
+
+    lines = [
+        "Build assistant:",
+        "",
+        f"Игра: {game_label}",
+        f"Цель: {goal_label}",
+        f"Бюджет: {budget_label}",
+        f"Стиль: {playstyle_label}",
+        "",
+        recommendation.title,
+        f"Класс: {recommendation.class_name}",
+        f"Ядро: {recommendation.core_skill}",
+        recommendation.summary,
+        f"Примерный бюджет: {recommendation.budget_estimate}",
+        f"Покупать в первую очередь: {', '.join(recommendation.buy_priority)}",
+        f"Какие статы добирать: {', '.join(recommendation.stat_targets)}",
+        f"Первые апгрейды: {', '.join(recommendation.first_upgrades)}",
+        f"Дерево / приоритеты прокачки: {', '.join(recommendation.tree_focus)}",
+        f"Атлас / направление фарма: {', '.join(recommendation.atlas_focus)}",
+        f"Что этим билдом фармить: {', '.join(recommendation.farm_mechanics)}",
+        "Эндгейм-чеклист по слотам:",
+        *[f"  - {entry}" for entry in recommendation.endgame_slot_checklist],
+        f"Эндгейм-цели: {', '.join(recommendation.endgame_goals)}",
+        f"Chase-апгрейды: {', '.join(recommendation.chase_upgrades)}",
+        f"Если хочется похожее, но по-другому: {recommendation.alternative_hint}",
+    ]
+
+    if recommendation.market_targets:
+        lines.append("Что искать на трейде:")
+        lines.extend(f"  - {entry}" for entry in recommendation.market_targets)
+    else:
+        lines.append(f"На каких слотах и архетипе шмоток фокус: {', '.join(recommendation.gear_focus)}")
+
+    if recommendation.avoid_warnings:
+        lines.append("Чего избегать:")
+        lines.extend(f"  - {entry}" for entry in recommendation.avoid_warnings)
+    else:
+        lines.append(f"Осторожно: {', '.join(recommendation.cautions)}")
+
+    if recommendation.planner_url or recommendation.guide_url or recommendation.tree_url or recommendation.atlas_url:
+        lines.append("Визуальные ресурсы доступны кнопками ниже.")
 
     return "\n".join(lines)
 
@@ -1467,24 +1497,80 @@ async def builds_back_to_playstyle(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("builds:playstyle:"))
-async def builds_show_recommendations(callback: CallbackQuery) -> None:
-    _, _, game, goal, budget_tier, playstyle = callback.data.split(":")
+@router.callback_query(F.data.startswith("builds:back:list:"))
+async def builds_back_to_list(callback: CallbackQuery) -> None:
+    _, _, _, game, goal, budget_tier, playstyle = callback.data.split(":")
     recommendations = BuildService().recommend(game=game, goal=goal, budget_tier=budget_tier, playstyle=playstyle)
     if callback.message:
         await callback.message.edit_text(
-            build_recommendations_text(
+            build_recommendations_overview_text(
                 game=game,
                 goal=goal,
                 budget_tier=budget_tier,
                 playstyle=playstyle,
                 recommendations=recommendations,
             ),
-            reply_markup=build_results_keyboard(
+            reply_markup=build_recommendation_list_keyboard(
                 game,
                 goal,
                 budget_tier,
-                recommendations[0] if recommendations else None,
+                playstyle,
+                recommendations,
+            ),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("builds:playstyle:"))
+async def builds_show_recommendations(callback: CallbackQuery) -> None:
+    _, _, game, goal, budget_tier, playstyle = callback.data.split(":")
+    recommendations = BuildService().recommend(game=game, goal=goal, budget_tier=budget_tier, playstyle=playstyle)
+    if callback.message:
+        await callback.message.edit_text(
+            build_recommendations_overview_text(
+                game=game,
+                goal=goal,
+                budget_tier=budget_tier,
+                playstyle=playstyle,
+                recommendations=recommendations,
+            ),
+            reply_markup=build_recommendation_list_keyboard(
+                game,
+                goal,
+                budget_tier,
+                playstyle,
+                recommendations,
+            ),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("builds:detail:"))
+async def builds_show_detail(callback: CallbackQuery) -> None:
+    _, _, game, goal, budget_tier, playstyle, index_str = callback.data.split(":")
+    recommendations = BuildService().recommend(game=game, goal=goal, budget_tier=budget_tier, playstyle=playstyle)
+    try:
+        recommendation = recommendations[int(index_str)]
+    except (IndexError, ValueError):
+        await callback.answer("Билд не найден, попробуй выбрать заново.", show_alert=True)
+        return
+
+    if callback.message:
+        await callback.message.edit_text(
+            build_recommendation_detail_text(
+                game=game,
+                goal=goal,
+                budget_tier=budget_tier,
+                playstyle=playstyle,
+                recommendation=recommendation,
+            ),
+            reply_markup=build_detail_keyboard(
+                game,
+                goal,
+                budget_tier,
+                playstyle,
+                int(index_str),
+                recommendation,
             ),
         )
     await callback.answer()
