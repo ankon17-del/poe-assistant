@@ -49,6 +49,7 @@ class TemplateService:
         "Currency Farming": "both",
         "POE2 Starter Economy": "poe2",
         "POE2 Exchange Watch": "poe2",
+        "POE2 Crafting Currency": "poe2",
         "POE1 Currency Farming": "poe1",
         "Essence Farming": "poe1",
         "Boss Drops": "poe1",
@@ -76,10 +77,10 @@ class TemplateService:
 
     GOAL_TEMPLATE_ORDER: dict[str, dict[str, list[str]]] = {
         "poe2": {
-            "starter_setup": ["POE2 Starter Economy", "Currency Farming"],
+            "starter_setup": ["POE2 Starter Economy"],
             "currency_farm": ["Currency Farming", "POE2 Starter Economy"],
             "market_watch": ["POE2 Exchange Watch", "Currency Farming"],
-            "specialized_farm": ["POE2 Exchange Watch"],
+            "specialized_farm": ["POE2 Crafting Currency", "POE2 Exchange Watch"],
         },
         "poe1": {
             "starter_setup": ["POE1 Currency Farming", "Currency Farming"],

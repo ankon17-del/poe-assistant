@@ -37,6 +37,16 @@ DEFAULT_TEMPLATES = [
         ],
     },
     {
+        "name": "POE2 Crafting Currency",
+        "description": "Crafting-focused POE2 watch for annul, regal and vaal value spikes.",
+        "category": "currency",
+        "items": [
+            ("Orb of Annulment", "currency", Decimal("7"), "chaos"),
+            ("Regal Orb", "currency", Decimal("2"), "chaos"),
+            ("Vaal Orb", "currency", Decimal("1"), "chaos"),
+        ],
+    },
+    {
         "name": "POE1 Currency Farming",
         "description": "Baseline POE1 currency checkpoints for farming sessions.",
         "category": "currency",
