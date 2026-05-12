@@ -35,6 +35,7 @@ class BuildRecommendation:
     summary: str
     market_targets: tuple[str, ...] = ()
     gear_sheet: tuple[str, ...] = ()
+    gear_progression: tuple[str, ...] = ()
     avoid_warnings: tuple[str, ...] = ()
     planner_url: str | None = None
     guide_url: str | None = None
@@ -132,6 +133,11 @@ class BuildService:
                 "Gloves/Boots: suppression, move speed on boots, life/ES, chaos res or attributes",
                 "Rings/Amulet/Belt: gem levels or crit multi on amulet, mana comfort where needed, life/ES, capped resistances",
                 "Jewels/Flasks: crit multi, spell damage, mine damage, with diamond + quartz/defensive flask setup",
+            ),
+            gear_progression=(
+                "Entry: закрой 6-link, нормальный wand/sceptre и базовую защиту по suppression/life/ES",
+                "Midgame: подними gem levels, crit consistency и mine throw speed, затем дочисти chaos res и sustain",
+                "Endgame: дорогой wand, сильный амулет под gem levels/crit multi и хорошие jewels под single target ceiling",
             ),
             avoid_warnings=(
                 "Map mods: reroll no/low mana sustain, reduced recovery, awkward curse interaction if your setup leans on it",
@@ -232,6 +238,11 @@ class BuildService:
                 "Rings/Amulet/Belt: mana sustain, cast speed, lightning scaling, attributes and resist coverage",
                 "Jewels/Charms: cast speed, lightning damage, crit/shock scaling, and utility that keeps uptime smooth",
             ),
+            gear_progression=(
+                "Entry: wand/focus с нормальным cast feel, mana sustain и живой defensive body под карты",
+                "Midgame: подтяни +levels, cast speed, crit/shock scaling и перестань чинить билд каждым новым кольцом",
+                "Endgame: уходи в дорогой planner-state с сильным weapon/focus, плотным ES/life слоем и jewel-слотами под ceiling dps",
+            ),
             avoid_warnings=(
                 "Map mods: no regen / harsh mana sustain mods и тяжёлые lightning-res stacks ощущаются плохо",
                 "Content: если билд ещё сырой, неприятны very tight boss arenas без места для Spark uptime",
@@ -329,6 +340,11 @@ class BuildService:
                 "Gloves/Boots: resistances, move speed, life/ES, then minion utility or convenience mods",
                 "Rings/Amulet/Belt: spirit economy, minion stats, life/ES, attributes and clean res coverage",
                 "Jewels/Charms: minion offense, spirit comfort, utility that smooths long boss fights and crowded maps",
+            ),
+            gear_progression=(
+                "Entry: реши spirit/setup, базовую защиту и уровни миньонов — без этого билд просто ощущается недособранным",
+                "Midgame: подними quality summon-loop, minion offense и сделай свою базу по life/ES скучно-стабильной",
+                "Endgame: дорогие +minion levels, сильные jewels и дорогой focus/щит уже под потолок урона и комфорт long fights",
             ),
             avoid_warnings=(
                 "Map mods: жёсткие anti-recovery / anti-minion uptime сочетания и хаотичный arena-pressure могут быть неприятны",
