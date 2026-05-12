@@ -37,6 +37,13 @@ class ResolvedTemplateItem:
     priority: int
 
 
+@dataclass(frozen=True)
+class TemplateGoal:
+    key: str
+    title: str
+    description: str
+
+
 class TemplateService:
     TEMPLATE_REALMS: dict[str, str] = {
         "Currency Farming": "both",
@@ -47,16 +54,40 @@ class TemplateService:
         "Boss Drops": "poe1",
         "Scarab Market": "poe1",
     }
+
     CURRENCY_STRATEGIES: tuple[TemplateStrategy, ...] = (
         TemplateStrategy("premium", "Премиум", "Ждать более сильную цену и меньше ложного шума."),
         TemplateStrategy("balanced", "Сбалансированная", "Нормальный базовый режим без перекоса."),
         TemplateStrategy("snipe", "Ранний сигнал", "Ловить движение раньше, но чаще получать alerts."),
     )
+
     WATCH_STRATEGIES: tuple[TemplateStrategy, ...] = (
         TemplateStrategy("focused", "Фокус", "Следить только за самыми приоритетными позициями."),
         TemplateStrategy("balanced", "Сбалансированная", "Оставить основной состав шаблона как есть."),
         TemplateStrategy("wide", "Широкий охват", "Держать более широкий watchlist и ловить движение раньше."),
     )
+
+    TEMPLATE_GOALS: tuple[TemplateGoal, ...] = (
+        TemplateGoal("starter_setup", "Стартовый сетап", "Быстро собрать чистый базовый стартовый market setup."),
+        TemplateGoal("currency_farm", "Фарм валюты", "Сфокусироваться на currency и быстрой ликвидности."),
+        TemplateGoal("market_watch", "Рынок и обмен", "Следить за exchange-курсами и ранними сигналами рынка."),
+        TemplateGoal("specialized_farm", "Специализированный фарм", "Подобрать pack под конкретную механику или тип фарма."),
+    )
+
+    GOAL_TEMPLATE_ORDER: dict[str, dict[str, list[str]]] = {
+        "poe2": {
+            "starter_setup": ["POE2 Starter Economy", "Currency Farming", "POE2 Exchange Watch"],
+            "currency_farm": ["POE2 Starter Economy", "Currency Farming", "POE2 Exchange Watch"],
+            "market_watch": ["POE2 Exchange Watch", "POE2 Starter Economy", "Currency Farming"],
+            "specialized_farm": ["POE2 Starter Economy", "POE2 Exchange Watch", "Currency Farming"],
+        },
+        "poe1": {
+            "starter_setup": ["POE1 Currency Farming", "Currency Farming", "Essence Farming"],
+            "currency_farm": ["POE1 Currency Farming", "Currency Farming", "Scarab Market"],
+            "market_watch": ["POE1 Currency Farming", "Currency Farming", "Scarab Market"],
+            "specialized_farm": ["Essence Farming", "Scarab Market", "Boss Drops", "POE1 Currency Farming"],
+        },
+    }
 
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -78,6 +109,19 @@ class TemplateService:
             if self.get_template_realm(template) in {game, "both"}
         ]
 
+    async def list_public_for_goal(self, game: str, goal_key: str) -> list[TemplateGroup]:
+        templates = await self.list_public_for_game(game)
+        order = self.GOAL_TEMPLATE_ORDER.get(game, {}).get(goal_key, [])
+        order_index = {name: index for index, name in enumerate(order)}
+        return sorted(
+            templates,
+            key=lambda template: (
+                order_index.get(template.name, len(order_index) + 100),
+                template.category,
+                template.name,
+            ),
+        )
+
     @classmethod
     def get_template_realm(cls, template: TemplateGroup) -> str:
         return cls.TEMPLATE_REALMS.get(template.name, "both")
@@ -88,6 +132,15 @@ class TemplateService:
             .where(TemplateGroup.id == template_group_id, TemplateGroup.is_public.is_(True))
             .options(selectinload(TemplateGroup.items))
         )
+
+    def list_goals(self) -> list[TemplateGoal]:
+        return list(self.TEMPLATE_GOALS)
+
+    def get_goal(self, goal_key: str) -> TemplateGoal | None:
+        for goal in self.TEMPLATE_GOALS:
+            if goal.key == goal_key:
+                return goal
+        return None
 
     def list_strategies(self, template: TemplateGroup) -> list[TemplateStrategy]:
         if template.category == "currency":

@@ -8,7 +8,12 @@ from app.models.tracked_item import TrackedItem
 from app.services.builds import BuildRecommendation
 
 
-def templates_keyboard(templates: list[TemplateGroup], game: str | None = None) -> InlineKeyboardMarkup:
+def templates_keyboard(
+    templates: list[TemplateGroup],
+    game: str | None = None,
+    *,
+    back_callback: str = "templates:choose_game",
+) -> InlineKeyboardMarkup:
     game_label = "POE 2" if game == "poe2" else "POE 1" if game == "poe1" else None
     rows = [
         [
@@ -24,7 +29,7 @@ def templates_keyboard(templates: list[TemplateGroup], game: str | None = None) 
         for template in templates
     ]
     if game:
-        rows.append([InlineKeyboardButton(text="Назад", callback_data="templates:choose_game")])
+        rows.append([InlineKeyboardButton(text="Назад", callback_data=back_callback)])
     rows.append([InlineKeyboardButton(text="Отмена", callback_data="template:cancel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -37,6 +42,17 @@ def template_browser_game_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Отмена", callback_data="template:cancel")],
         ]
     )
+
+
+def template_goal_keyboard(game: str, goals: list) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(text=goal.title, callback_data=f"templates:goal:{game}:{goal.key}")]
+        for goal in goals
+    ]
+    rows.append([InlineKeyboardButton(text="Показать все шаблоны", callback_data=f"templates:all:{game}")])
+    rows.append([InlineKeyboardButton(text="Назад", callback_data="templates:choose_game")])
+    rows.append([InlineKeyboardButton(text="Отмена", callback_data="template:cancel")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def template_game_keyboard(template_id: int) -> InlineKeyboardMarkup:
@@ -53,7 +69,7 @@ def template_preview_keyboard(template_id: int, game: str) -> InlineKeyboardMark
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Выбрать стратегию", callback_data=f"template_strategy:{template_id}:{game}:balanced")],
-            [InlineKeyboardButton(text="Назад", callback_data="templates:choose_game")],
+            [InlineKeyboardButton(text="Назад", callback_data=f"templates:goals:{game}")],
             [InlineKeyboardButton(text="Отмена", callback_data="template:cancel")],
         ]
     )
@@ -98,9 +114,7 @@ def tracking_actions_keyboard(items: list[TrackedItem]) -> InlineKeyboardMarkup:
     rows = []
     for item in items:
         if item.target_price is not None and not item.notify_enabled:
-            rows.append(
-                [InlineKeyboardButton(text=f"Перезапустить #{item.id}", callback_data=f"list2:reactivate:{item.id}")]
-            )
+            rows.append([InlineKeyboardButton(text=f"Перезапустить #{item.id}", callback_data=f"list2:reactivate:{item.id}")])
         rows.append([InlineKeyboardButton(text=f"Отключить #{item.id}", callback_data=f"list2:remove:{item.id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

@@ -29,6 +29,7 @@ from app.bot.keyboards import (
     stash_guide_keyboard,
     template_browser_game_keyboard,
     template_game_keyboard,
+    template_goal_keyboard,
     template_league_keyboard,
     template_preview_keyboard,
     template_strategy_keyboard,
@@ -1833,7 +1834,7 @@ async def templates(message: Message) -> None:
 @router.callback_query(F.data == "templates:choose_game")
 async def templates_choose_game(callback: CallbackQuery) -> None:
     await callback.message.edit_text(
-        "Шаблоны:\nСнова выбери игру, и я покажу только релевантные наборы.",
+        "Шаблоны:\nСнова выбери игру, и я покажу релевантные цели и наборы.",
         reply_markup=template_browser_game_keyboard(),
     )
     await callback.answer()
@@ -1841,6 +1842,61 @@ async def templates_choose_game(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("templates:game:"))
 async def templates_for_game(callback: CallbackQuery) -> None:
+    game = callback.data.rsplit(":", 1)[1]
+
+    async with session_scope() as session:
+        goals = TemplateService(session).list_goals()
+
+    game_label = "POE 2" if game == "poe2" else "POE 1"
+    await callback.message.edit_text(
+        f"Шаблоны для {game_label}:\nСначала выбери цель, и я покажу наборы в более полезном порядке.",
+        reply_markup=template_goal_keyboard(game, goals),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("templates:goals:"))
+async def templates_back_to_goals(callback: CallbackQuery) -> None:
+    game = callback.data.rsplit(":", 1)[1]
+    async with session_scope() as session:
+        goals = TemplateService(session).list_goals()
+
+    game_label = "POE 2" if game == "poe2" else "POE 1"
+    await callback.message.edit_text(
+        f"Шаблоны для {game_label}:\nСначала выбери цель, и я покажу наборы в более полезном порядке.",
+        reply_markup=template_goal_keyboard(game, goals),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("templates:goal:"))
+async def templates_for_goal(callback: CallbackQuery) -> None:
+    _, _, game, goal_key = callback.data.split(":")
+
+    async with session_scope() as session:
+        service = TemplateService(session)
+        templates = await service.list_public_for_goal(game, goal_key)
+        goal = service.get_goal(goal_key)
+
+    if not templates:
+        await callback.answer("Для этой цели шаблонов пока нет", show_alert=True)
+        return
+
+    goal_title = goal.title if goal else "Под эту цель"
+    game_label = "POE 2" if game == "poe2" else "POE 1"
+    await callback.message.edit_text(
+        f"{goal_title} · {game_label}\nНиже уже отсортированы самые релевантные наборы для этой задачи.",
+        reply_markup=templates_keyboard(
+            templates,
+            game=game,
+            back_callback=f"templates:goals:{game}",
+        ),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("templates:all:"))
+async def templates_show_all_for_game(callback: CallbackQuery) -> None:
     game = callback.data.rsplit(":", 1)[1]
 
     async with session_scope() as session:
@@ -1852,8 +1908,12 @@ async def templates_for_game(callback: CallbackQuery) -> None:
 
     game_label = "POE 2" if game == "poe2" else "POE 1"
     await callback.message.edit_text(
-        f"Шаблоны для {game_label}:\nВыбери набор, и я добавлю его в нужную лигу.",
-        reply_markup=templates_keyboard(templates, game=game),
+        f"Все шаблоны для {game_label}\nЕсли нужен не рекомендованный сценарий, можно выбрать набор вручную.",
+        reply_markup=templates_keyboard(
+            templates,
+            game=game,
+            back_callback=f"templates:goals:{game}",
+        ),
     )
     await callback.answer()
 
