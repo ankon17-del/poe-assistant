@@ -33,6 +33,10 @@ class BuildRecommendation:
     defense_fixes: tuple[str, ...]
     alternative_hint: str
     summary: str
+    planner_url: str | None = None
+    guide_url: str | None = None
+    tree_url: str | None = None
+    source_note: str | None = None
 
 
 class BuildService:
@@ -110,6 +114,10 @@ class BuildService:
             defense_fixes=("evasion or ES слой", "spell suppression", "хаос-рез, если проседает"),
             alternative_hint="Если хочется спокойнее и толще, но с меньшим микро, посмотри на Righteous Fire Chieftain.",
             summary="Хороший универсальный выбор, если нужен баланс между фармом и убийством боссов.",
+            planner_url="https://www.poe-vault.com/guides/hexblast-miner-saboteur-build-guide",
+            guide_url="https://www.youtube.com/watch?v=8XHF0seCGZQ",
+            tree_url="https://www.poe-vault.com/guides/hexblast-miner-saboteur-passive-skill-tree-gems-links",
+            source_note="PoE1-референс пока community-sourced и может отставать от текущего баланса, но даёт реальную пассивку, гемы и gear-скелет.",
         ),
         BuildRecommendation(
             title="Righteous Fire Chieftain",
@@ -184,6 +192,10 @@ class BuildService:
             defense_fixes=("energy shield или life слой", "резисты", "позиционная выживаемость"),
             alternative_hint="Если хочется такой же стартовой надёжности, но спокойнее по механике, рядом стоит Minion Infernalist.",
             summary="Очень крепкий POE2-старт, если нужен универсальный caster для раннего фарма.",
+            planner_url="https://maxroll.gg/poe2/planner/xpedn0v4",
+            guide_url="https://poe2db.org/poe2-youtube-video-collection/hwlKJUdbNVc",
+            tree_url="https://poe2db.org/poe2-youtube-video-collection/hwlKJUdbNVc",
+            source_note="В guide есть gameplay, gear walkthrough, atlas tree и passive tree по таймкодам; planner ведёт в наглядную сборку.",
         ),
         BuildRecommendation(
             title="Ice Strike Monk",
@@ -258,6 +270,10 @@ class BuildService:
             defense_fixes=("щит/броня по ситуации", "life or ES", "резисты и recovery"),
             alternative_hint="Если хочется активнее и быстрее чистить карты, но всё ещё универсально, посмотри Spark Stormweaver.",
             summary="Хороший выбор, если хочется безопасного старта и меньше давления по механике.",
+            planner_url="https://maxroll.gg/poe2/planner/fjuim01r",
+            guide_url="https://poe2db.org/poe2-youtube-video-collection/87vFSy5j7QY",
+            tree_url="https://poe2db.org/poe2-youtube-video-collection/87vFSy5j7QY",
+            source_note="Эта связка уже ведёт в реальный endgame guide с gear walkthrough, atlas-пассивками и planner для дерева/предметов.",
         ),
         BuildRecommendation(
             title="Gas Arrow Huntress",

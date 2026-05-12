@@ -5,6 +5,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from app.models.league import League
 from app.models.template import TemplateGroup
 from app.models.tracked_item import TrackedItem
+from app.services.builds import BuildRecommendation
 
 
 def templates_keyboard(templates: list[TemplateGroup], game: str | None = None) -> InlineKeyboardMarkup:
@@ -147,6 +148,25 @@ def build_playstyle_keyboard(game: str, goal: str, budget_tier: str) -> InlineKe
             [InlineKeyboardButton(text="Назад", callback_data=f"builds:back:budget:{game}:{goal}")],
         ]
     )
+
+
+def build_results_keyboard(
+    game: str,
+    goal: str,
+    budget_tier: str,
+    recommendation: BuildRecommendation | None,
+) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if recommendation:
+        if recommendation.planner_url:
+            rows.append([InlineKeyboardButton(text="Открыть Planner", url=recommendation.planner_url)])
+        if recommendation.guide_url:
+            rows.append([InlineKeyboardButton(text="Открыть Guide", url=recommendation.guide_url)])
+        if recommendation.tree_url:
+            rows.append([InlineKeyboardButton(text="Открыть Tree", url=recommendation.tree_url)])
+    rows.append([InlineKeyboardButton(text="Назад к стилю", callback_data=f"builds:back:playstyle:{game}:{goal}:{budget_tier}")])
+    rows.append([InlineKeyboardButton(text="Назад к бюджету", callback_data=f"builds:back:budget:{game}:{goal}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def add_entry_keyboard() -> InlineKeyboardMarkup:

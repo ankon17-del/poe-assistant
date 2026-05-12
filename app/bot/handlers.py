@@ -17,6 +17,7 @@ from app.bot.keyboards import (
     build_game_keyboard,
     build_goal_keyboard,
     build_playstyle_keyboard,
+    build_results_keyboard,
     currency_presets_keyboard,
     duplicate_resolution_keyboard,
     game_keyboard,
@@ -310,6 +311,10 @@ def build_recommendations_text(
                     f"Если хочется похожее, но по-другому: {recommendation.alternative_hint}",
                 ]
             )
+            if recommendation.planner_url or recommendation.guide_url or recommendation.tree_url:
+                lines.insert(lines.index(f"Покупать в первую очередь: {', '.join(recommendation.buy_priority)}"), "Ресурсы: planner / guide / tree кнопками ниже.")
+            if recommendation.source_note:
+                lines.append(f"Источник: {recommendation.source_note}")
         else:
             lines.extend(
                 [
@@ -1451,6 +1456,17 @@ async def builds_choose_playstyle(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("builds:back:playstyle:"))
+async def builds_back_to_playstyle(callback: CallbackQuery) -> None:
+    _, _, _, game, goal, budget_tier = callback.data.split(":")
+    if callback.message:
+        await callback.message.edit_text(
+            build_playstyle_prompt_text(game, goal, budget_tier),
+            reply_markup=build_playstyle_keyboard(game, goal, budget_tier),
+        )
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("builds:playstyle:"))
 async def builds_show_recommendations(callback: CallbackQuery) -> None:
     _, _, game, goal, budget_tier, playstyle = callback.data.split(":")
@@ -1464,7 +1480,12 @@ async def builds_show_recommendations(callback: CallbackQuery) -> None:
                 playstyle=playstyle,
                 recommendations=recommendations,
             ),
-            reply_markup=build_playstyle_keyboard(game, goal, budget_tier),
+            reply_markup=build_results_keyboard(
+                game,
+                goal,
+                budget_tier,
+                recommendations[0] if recommendations else None,
+            ),
         )
     await callback.answer()
 
