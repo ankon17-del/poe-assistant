@@ -52,19 +52,44 @@ def template_game_keyboard(template_id: int) -> InlineKeyboardMarkup:
 def template_preview_keyboard(template_id: int, game: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Выбрать лигу", callback_data=f"template_pick_league:{template_id}:{game}")],
+            [InlineKeyboardButton(text="Выбрать стратегию", callback_data=f"template_strategy:{template_id}:{game}:balanced")],
             [InlineKeyboardButton(text="Назад", callback_data="templates:choose_game")],
             [InlineKeyboardButton(text="Отмена", callback_data="template:cancel")],
         ]
     )
 
 
-def template_league_keyboard(template_id: int, leagues: list[League], game: str) -> InlineKeyboardMarkup:
+def template_strategy_keyboard(template_id: int, game: str, strategies: list, selected_key: str) -> InlineKeyboardMarkup:
+    rows = []
+    for strategy in strategies:
+        prefix = "• " if strategy.key == selected_key else ""
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=f"{prefix}{strategy.title}",
+                    callback_data=f"template_strategy:{template_id}:{game}:{strategy.key}",
+                )
+            ]
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text="Выбрать лигу",
+                callback_data=f"template_strategy_league:{template_id}:{game}:{selected_key}",
+            )
+        ]
+    )
+    rows.append([InlineKeyboardButton(text="Назад", callback_data=f"template_back:{template_id}:{game}")])
+    rows.append([InlineKeyboardButton(text="Отмена", callback_data="template:cancel")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def template_league_keyboard(template_id: int, leagues: list[League], game: str, strategy_key: str) -> InlineKeyboardMarkup:
     rows = [
-        [InlineKeyboardButton(text=league.name, callback_data=f"template_league:{template_id}:{league.id}")]
+        [InlineKeyboardButton(text=league.name, callback_data=f"template_strategy_apply:{template_id}:{league.id}:{strategy_key}")]
         for league in leagues
     ]
-    rows.append([InlineKeyboardButton(text="Назад", callback_data=f"template_back:{template_id}:{game}")])
+    rows.append([InlineKeyboardButton(text="Назад", callback_data=f"template_strategy:{template_id}:{game}:{strategy_key}")])
     rows.append([InlineKeyboardButton(text="Отмена", callback_data="template:cancel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

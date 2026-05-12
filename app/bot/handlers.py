@@ -31,6 +31,7 @@ from app.bot.keyboards import (
     template_game_keyboard,
     template_league_keyboard,
     template_preview_keyboard,
+    template_strategy_keyboard,
     templates_keyboard,
     threshold_currency_keyboard,
     tracking_actions_keyboard,
@@ -227,6 +228,78 @@ def build_template_activation_text(result, league) -> str:
         f"Шаблон {result.template_name} подключен.",
         f"Игра: {game_label}",
         f"Лига: {league.name}",
+        f"Создано watcher'ов: {result.created_count}",
+        f"Обновлено или реактивировано: {result.updated_count}",
+    ]
+
+    if result.created_items:
+        lines.append("")
+        lines.append("Созданы:")
+        lines.extend(f"- {item_name}" for item_name in result.created_items)
+
+    if result.updated_items:
+        lines.append("")
+        lines.append("Обновлены или реактивированы:")
+        lines.extend(f"- {item_name}" for item_name in result.updated_items)
+
+    return "\n".join(lines)
+
+
+def build_template_preview_text(template, game: str, strategy=None, resolved_items: list | None = None) -> str:
+    game_label = "POE 2" if game == "poe2" else "POE 1"
+    lines = [f"Шаблон: {template.name}", f"Игра: {game_label}"]
+    if template.description:
+        lines.append(template.description)
+    if strategy is None or resolved_items is None:
+        lines.extend(["", "Будет добавлено:"])
+        for item in template.items:
+            item_line = f"- {item.item_name}"
+            details: list[str] = []
+            if item.item_type:
+                details.append(item.item_type)
+            if item.default_threshold is not None:
+                details.append(f">= {format_decimal(Decimal(item.default_threshold))} {item.default_target_currency}")
+            if details:
+                item_line += f" ({', '.join(details)})"
+            lines.append(item_line)
+        lines.extend(["", "Если всё подходит, дальше выберем стратегию и лигу для применения шаблона."])
+        return "\n".join(lines)
+
+    lines.extend(
+        [
+            "",
+            f"Стратегия: {strategy.title}",
+            strategy.description,
+            "",
+            "Будет добавлено:",
+        ]
+    )
+    for item in resolved_items:
+        item_line = f"- {item.item_name}"
+        details: list[str] = []
+        if item.item_type:
+            details.append(item.item_type)
+        if item.target_price is not None:
+            details.append(f">= {format_decimal(item.target_price)} {item.target_currency}")
+        if details:
+            item_line += f" ({', '.join(details)})"
+        lines.append(item_line)
+    lines.extend(
+        [
+            "",
+            "Сначала выбери стратегию применения, потом лигу. Так один и тот же шаблон можно запускать как более ранний, аккуратный или широкий сетап.",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def build_template_activation_text(result, league) -> str:
+    game_label = "POE 2" if league.realm == "poe2" else "POE 1"
+    lines = [
+        f"Шаблон {result.template_name} подключен.",
+        f"Игра: {game_label}",
+        f"Лига: {league.name}",
+        f"Стратегия: {result.strategy_name}",
         f"Создано watcher'ов: {result.created_count}",
         f"Обновлено или реактивировано: {result.updated_count}",
     ]
@@ -1842,6 +1915,57 @@ async def choose_template_game(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("template_strategy:"))
+async def choose_template_strategy(callback: CallbackQuery) -> None:
+    _, template_id_raw, game, strategy_key = callback.data.split(":")
+    template_id = int(template_id_raw)
+
+    async with session_scope() as session:
+        service = TemplateService(session)
+        template = await service.get_public_by_id(template_id)
+
+    if not template:
+        await callback.answer("Шаблон не найден", show_alert=True)
+        return
+
+    strategy, resolved_items = service.resolve_items(template, strategy_key=strategy_key)
+    await callback.message.edit_text(
+        build_template_preview_text(template, game, strategy, resolved_items),
+        reply_markup=template_strategy_keyboard(
+            template.id,
+            game,
+            service.list_strategies(template),
+            strategy.key,
+        ),
+    )
+    await callback.answer("Стратегия обновлена")
+
+
+@router.callback_query(F.data.startswith("template_strategy_league:"))
+async def choose_template_league_for_strategy(callback: CallbackQuery) -> None:
+    _, template_id_raw, game, strategy_key = callback.data.split(":")
+    template_id = int(template_id_raw)
+
+    async with session_scope() as session:
+        leagues = await LeagueService(session).list_selection_options(game)
+        service = TemplateService(session)
+        template = await service.get_public_by_id(template_id)
+
+    if not template:
+        await callback.answer("Шаблон не найден", show_alert=True)
+        return
+
+    strategy = service.get_strategy(template, strategy_key)
+    await callback.message.edit_text(
+        f"Шаблон: {template.name}\n"
+        f"Игра: {'POE 2' if game == 'poe2' else 'POE 1'}\n"
+        f"Стратегия: {strategy.title}\n\n"
+        "Теперь выбери лигу, в которую добавить watchers из этого шаблона.",
+        reply_markup=template_league_keyboard(template.id, leagues, game, strategy_key),
+    )
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("template_pick_league:"))
 async def choose_template_league_after_preview(callback: CallbackQuery) -> None:
     _, template_id_raw, game = callback.data.split(":")
@@ -1881,6 +2005,35 @@ async def template_back_to_game(callback: CallbackQuery) -> None:
         reply_markup=template_preview_keyboard(template.id, game),
     )
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("template_strategy_apply:"))
+async def activate_template_for_strategy(callback: CallbackQuery) -> None:
+    _, template_id_raw, league_id_raw, strategy_key = callback.data.split(":")
+    template_id = int(template_id_raw)
+    league_id = int(league_id_raw)
+
+    async with session_scope() as session:
+        user = await ensure_user(session, callback.from_user.id, callback.from_user.username)
+        league = await LeagueService(session).get_by_id(league_id)
+        if not league:
+            await callback.answer("Лига не найдена", show_alert=True)
+            return
+
+        result = await TemplateService(session).activate(
+            user=user,
+            template_group_id=template_id,
+            league_name=league.name,
+            game=league.realm,
+            strategy_key=strategy_key,
+        )
+
+    if not result:
+        await callback.answer("Шаблон не найден", show_alert=True)
+        return
+
+    await callback.message.edit_text(build_template_activation_text(result, league))
+    await callback.answer("Шаблон подключен")
 
 
 @router.callback_query(F.data.startswith("template_league:"))
