@@ -12,29 +12,28 @@ from app.models.template import TemplateGroup, TemplateItem
 DEFAULT_TEMPLATES = [
     {
         "name": "Currency Farming",
-        "description": "Baseline currency watchers for either game.",
+        "description": "Liquid currency watch for Divine and Exalted moves.",
         "category": "currency",
         "items": [
-            ("Divine Orb", "currency", Decimal("15"), "chaos"),
-            ("Exalted Orb", "currency", Decimal("8"), "chaos"),
+            ("Divine Orb", "currency", Decimal("150"), "chaos"),
+            ("Exalted Orb", "currency", Decimal("9"), "chaos"),
         ],
     },
     {
         "name": "POE2 Starter Economy",
-        "description": "A clean starter setup for POE2 currency tracking.",
+        "description": "Minimal POE2 starter setup with one clean Divine anchor.",
         "category": "currency",
         "items": [
             ("Divine Orb", "currency", Decimal("160"), "chaos"),
-            ("Exalted Orb", "currency", Decimal("9"), "chaos"),
         ],
     },
     {
         "name": "POE2 Exchange Watch",
-        "description": "Useful POE2 exchange checkpoints for daily market checks.",
+        "description": "Cross-rate POE2 watch for exchange timing and market turns.",
         "category": "currency",
         "items": [
-            ("Divine Orb", "currency", Decimal("17"), "ex"),
-            ("Exalted Orb", "currency", Decimal("9"), "chaos"),
+            ("Divine Orb", "currency", Decimal("18"), "ex"),
+            ("Exalted Orb", "currency", Decimal("10"), "chaos"),
         ],
     },
     {

@@ -76,16 +76,16 @@ class TemplateService:
 
     GOAL_TEMPLATE_ORDER: dict[str, dict[str, list[str]]] = {
         "poe2": {
-            "starter_setup": ["POE2 Starter Economy", "Currency Farming", "POE2 Exchange Watch"],
-            "currency_farm": ["POE2 Starter Economy", "Currency Farming", "POE2 Exchange Watch"],
-            "market_watch": ["POE2 Exchange Watch", "POE2 Starter Economy", "Currency Farming"],
-            "specialized_farm": ["POE2 Starter Economy", "POE2 Exchange Watch", "Currency Farming"],
+            "starter_setup": ["POE2 Starter Economy", "Currency Farming"],
+            "currency_farm": ["Currency Farming", "POE2 Starter Economy"],
+            "market_watch": ["POE2 Exchange Watch", "Currency Farming"],
+            "specialized_farm": ["POE2 Exchange Watch"],
         },
         "poe1": {
-            "starter_setup": ["POE1 Currency Farming", "Currency Farming", "Essence Farming"],
+            "starter_setup": ["POE1 Currency Farming", "Currency Farming"],
             "currency_farm": ["POE1 Currency Farming", "Currency Farming", "Scarab Market"],
             "market_watch": ["POE1 Currency Farming", "Currency Farming", "Scarab Market"],
-            "specialized_farm": ["Essence Farming", "Scarab Market", "Boss Drops", "POE1 Currency Farming"],
+            "specialized_farm": ["Essence Farming", "Scarab Market", "Boss Drops"],
         },
     }
 
@@ -112,15 +112,11 @@ class TemplateService:
     async def list_public_for_goal(self, game: str, goal_key: str) -> list[TemplateGroup]:
         templates = await self.list_public_for_game(game)
         order = self.GOAL_TEMPLATE_ORDER.get(game, {}).get(goal_key, [])
-        order_index = {name: index for index, name in enumerate(order)}
-        return sorted(
-            templates,
-            key=lambda template: (
-                order_index.get(template.name, len(order_index) + 100),
-                template.category,
-                template.name,
-            ),
-        )
+        if not order:
+            return templates
+
+        templates_by_name = {template.name: template for template in templates}
+        return [templates_by_name[name] for name in order if name in templates_by_name]
 
     @classmethod
     def get_template_realm(cls, template: TemplateGroup) -> str:
