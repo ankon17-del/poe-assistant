@@ -83,7 +83,7 @@ def format_decimal(value: Decimal) -> str:
 def build_tracking_lines(item) -> list[str]:
     league_name = item.league.name if item.league else "Без лиги"
     game_label = "POE 2" if item.league and item.league.realm == "poe2" else "POE 1"
-    lines = [f"#{item.id} - {item.item_name}", f"Игра: {game_label}", f"Лига: {league_name}"]
+    lines = [f"#{item.id} · {item.item_name}", f"{game_label} / {league_name}"]
     if item.target_price is not None:
         lines.append(f"Порог: {format_decimal(Decimal(item.target_price))} {item.target_currency}")
         status_label = "активен" if item.notify_enabled else "сработал, ждёт перезапуска"
@@ -96,7 +96,7 @@ def build_tracking_lines(item) -> list[str]:
 
 
 def build_tracking_list_text(items: list) -> str:
-    lines = [f"Активный трекинг: {len(items)}"]
+    lines = [f"Трекинг · {len(items)}"]
     grouped: dict[tuple[str, str], list] = {}
     for item in items:
         game_label = "POE 2" if item.league and item.league.realm == "poe2" else "POE 1"
@@ -105,7 +105,7 @@ def build_tracking_list_text(items: list) -> str:
 
     for (game_label, league_name), group_items in sorted(grouped.items(), key=lambda entry: (entry[0][0], entry[0][1])):
         lines.append("")
-        lines.append(f"{game_label} / {league_name} — {len(group_items)}")
+        lines.append(f"{game_label} / {league_name} · {len(group_items)}")
         for item in group_items:
             lines.append("\n".join(build_tracking_lines(item)))
     return "\n\n".join(lines)
@@ -115,20 +115,21 @@ def build_paused_alerts_text(items: list) -> str:
     poe1_count = sum(1 for item in items if item.league and item.league.realm == "poe1")
     poe2_count = sum(1 for item in items if item.league and item.league.realm == "poe2")
 
-    lines = [f"Сработавшие alerts: {len(items)}"]
+    lines = [f"Алерты на паузе · {len(items)}"]
     if poe1_count:
         lines.append(f"POE 1: {poe1_count}")
     if poe2_count:
         lines.append(f"POE 2: {poe2_count}")
+    lines.append("")
     for item in items:
         lines.append("\n".join(build_tracking_lines(item)))
     lines.append("")
-    lines.append("Здесь можно быстро вернуть alert в работу целиком, по игре или отключить его совсем.")
+    lines.append("Можно перезапустить alert целиком, по игре или отключить его совсем.")
     return "\n\n".join(lines)
 
 
 def build_account_text(*, integration, oauth_config_error: str | None) -> str:
-    lines = ["PoE аккаунт:"]
+    lines = ["Аккаунт"]
     if integration:
         lines.append("Статус: подключён")
         if integration.external_account_name:
@@ -152,7 +153,7 @@ def build_account_text(*, integration, oauth_config_error: str | None) -> str:
 
 
 def build_stash_text(summary) -> str:
-    lines = ["Stash assistant:", ""]
+    lines = ["Тайник", ""]
 
     if summary.account_connected:
         if summary.account_name:
@@ -584,16 +585,20 @@ def build_recommendation_detail_text(
 
 
 def build_economy_text(summaries: list, overview) -> str:
-    lines = ["Экономика:"]
-    lines.append("")
-    lines.append(f"Активные currency alerts: {overview.total_active_currency_alerts}")
-    lines.append(f"Сработавшие alerts на паузе: {overview.total_paused_currency_alerts}")
+    lines = [
+        "Экономика",
+        "",
+        f"Активные currency alerts: {overview.total_active_currency_alerts}",
+        f"На паузе: {overview.total_paused_currency_alerts}",
+    ]
+
     if overview.market_hints:
-        lines.append("Что делать сейчас:")
+        lines.extend(["", "Что делать сейчас:"])
         for hint in overview.market_hints:
             lines.append(f"- {hint.title}: {hint.detail}")
+
     if overview.market_pulse:
-        lines.append("Market pulse:")
+        lines.extend(["", "Market pulse:"])
         if overview.market_pulse.hottest_movement:
             movement = overview.market_pulse.hottest_movement
             game_label = "POE 2" if movement.game == "poe2" else "POE 1"
@@ -614,8 +619,9 @@ def build_economy_text(summaries: list, overview) -> str:
             )
         if overview.market_pulse.total_moving_markets:
             lines.append(f"- Двигающихся market-срезов: {overview.market_pulse.total_moving_markets}")
+
     if overview.top_watched_currencies:
-        lines.append("Топ отслеживаемых валют:")
+        lines.extend(["", "Топ отслеживаемых валют:"])
         for entry in overview.top_watched_currencies:
             line = f"- {entry.item_name}: {entry.total_watchers}"
             details = []
@@ -626,8 +632,9 @@ def build_economy_text(summaries: list, overview) -> str:
             if details:
                 line += f" ({', '.join(details)})"
             lines.append(line)
+
     if overview.nearest_alerts:
-        lines.append("Ближе всего к срабатыванию:")
+        lines.extend(["", "Ближе всего к срабатыванию:"])
         for alert in overview.nearest_alerts:
             game_label = "POE 2" if alert.game == "poe2" else "POE 1"
             progress_percent = min(alert.progress_ratio * Decimal("100"), Decimal("999"))
@@ -637,8 +644,9 @@ def build_economy_text(summaries: list, overview) -> str:
                 f"{format_decimal(alert.current_value)} / {format_decimal(alert.target_price)} {alert.target_currency} "
                 f"({format_decimal(progress_percent)}%)"
             )
+
     if overview.market_movements:
-        lines.append("Движение рынка с прошлого snapshot'а:")
+        lines.extend(["", "Движение рынка:"])
         for movement in overview.market_movements:
             game_label = "POE 2" if movement.game == "poe2" else "POE 1"
             currency_label = "Divine Orb" if movement.currency_code == "div" else "Exalted Orb"
@@ -652,8 +660,7 @@ def build_economy_text(summaries: list, overview) -> str:
 
     for summary in summaries:
         game_label = "POE 2" if summary.game == "poe2" else "POE 1"
-        lines.append("")
-        lines.append(f"{game_label} / {summary.league_name}")
+        lines.extend(["", f"{game_label} / {summary.league_name}"])
 
         snapshot = summary.exchange_snapshot
         if snapshot:
@@ -673,7 +680,7 @@ def build_economy_text(summaries: list, overview) -> str:
             lines.append("Я также попробовал fallback на Standard, но внешние данные не пришли.")
 
         if summary.active_watchers:
-            lines.append(f"Активные currency alerts: {len(summary.active_watchers)}")
+            lines.append(f"Активные alerts: {len(summary.active_watchers)}")
             for watcher in summary.active_watchers[:5]:
                 lines.append(
                     f"- #{watcher.tracked_item_id} {watcher.item_name} >= "
@@ -682,10 +689,10 @@ def build_economy_text(summaries: list, overview) -> str:
             if len(summary.active_watchers) > 5:
                 lines.append(f"- ... еще {len(summary.active_watchers) - 5}")
         else:
-            lines.append("Активных currency alerts пока нет.")
+            lines.append("Активных alerts пока нет.")
 
         if summary.paused_watchers:
-            lines.append(f"Сработавшие alerts на паузе: {len(summary.paused_watchers)}")
+            lines.append(f"На паузе: {len(summary.paused_watchers)}")
             for watcher in summary.paused_watchers[:3]:
                 lines.append(
                     f"- #{watcher.tracked_item_id} {watcher.item_name} "
@@ -695,8 +702,12 @@ def build_economy_text(summaries: list, overview) -> str:
                 lines.append(f"- ... еще {len(summary.paused_watchers) - 3}")
             lines.append("Открой /alerts, чтобы быстро перезапустить их.")
 
-    lines.append("")
-    lines.append("Подсказка: currency alert срабатывает, когда рыночная цена достигает или превышает твой порог.")
+    lines.extend(
+        [
+            "",
+            "Подсказка: currency alert срабатывает, когда рыночная цена достигает или превышает твой порог.",
+        ]
+    )
     return "\n".join(lines)
 
 
