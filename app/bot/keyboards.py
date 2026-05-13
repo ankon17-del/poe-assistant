@@ -86,7 +86,8 @@ def template_goal_keyboard(game: str, goals: list) -> InlineKeyboardMarkup:
         for goal in goals
     ]
     rows.append([InlineKeyboardButton(text="Показать все шаблоны", callback_data=f"templates:all:{game}")])
-    rows.append([InlineKeyboardButton(text="Назад", callback_data="templates:choose_game")])
+    rows.append([InlineKeyboardButton(text="Назад к играм", callback_data="templates:choose_game")])
+    rows.append([InlineKeyboardButton(text="Домой", callback_data="menu:home")])
     rows.append([InlineKeyboardButton(text="Отмена", callback_data="template:cancel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -105,7 +106,8 @@ def template_preview_keyboard(template_id: int, game: str) -> InlineKeyboardMark
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Выбрать стратегию", callback_data=f"template_strategy:{template_id}:{game}:balanced")],
-            [InlineKeyboardButton(text="Назад", callback_data=f"templates:goals:{game}")],
+            [InlineKeyboardButton(text="Назад к целям", callback_data=f"templates:goals:{game}")],
+            [InlineKeyboardButton(text="Домой", callback_data="menu:home")],
             [InlineKeyboardButton(text="Отмена", callback_data="template:cancel")],
         ]
     )
@@ -131,7 +133,8 @@ def template_strategy_keyboard(template_id: int, game: str, strategies: list, se
             )
         ]
     )
-    rows.append([InlineKeyboardButton(text="Назад", callback_data=f"template_back:{template_id}:{game}")])
+    rows.append([InlineKeyboardButton(text="Назад к шаблону", callback_data=f"template_back:{template_id}:{game}")])
+    rows.append([InlineKeyboardButton(text="Домой", callback_data="menu:home")])
     rows.append([InlineKeyboardButton(text="Отмена", callback_data="template:cancel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -141,7 +144,8 @@ def template_league_keyboard(template_id: int, leagues: list[League], game: str,
         [InlineKeyboardButton(text=league.name, callback_data=f"template_strategy_apply:{template_id}:{league.id}:{strategy_key}")]
         for league in leagues
     ]
-    rows.append([InlineKeyboardButton(text="Назад", callback_data=f"template_strategy:{template_id}:{game}:{strategy_key}")])
+    rows.append([InlineKeyboardButton(text="Назад к стратегиям", callback_data=f"template_strategy:{template_id}:{game}:{strategy_key}")])
+    rows.append([InlineKeyboardButton(text="Домой", callback_data="menu:home")])
     rows.append([InlineKeyboardButton(text="Отмена", callback_data="template:cancel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -219,7 +223,8 @@ def build_goal_keyboard(game: str) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Фарм валюты", callback_data=f"builds:goal:{game}:currency_farm")],
             [InlineKeyboardButton(text="Комфортный прогресс", callback_data=f"builds:goal:{game}:comfortable_progress")],
             [InlineKeyboardButton(text="Убить боссов", callback_data=f"builds:goal:{game}:boss_kill")],
-            [InlineKeyboardButton(text="Назад", callback_data="builds:back:game")],
+            [InlineKeyboardButton(text="Назад к играм", callback_data="builds:back:game")],
+            [InlineKeyboardButton(text="Домой", callback_data="menu:home")],
         ]
     )
 
@@ -230,7 +235,8 @@ def build_budget_keyboard(game: str, goal: str) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Стартовый", callback_data=f"builds:budget:{game}:{goal}:starter")],
             [InlineKeyboardButton(text="Средний", callback_data=f"builds:budget:{game}:{goal}:mid")],
             [InlineKeyboardButton(text="Высокий", callback_data=f"builds:budget:{game}:{goal}:high")],
-            [InlineKeyboardButton(text="Назад", callback_data=f"builds:back:goal:{game}")],
+            [InlineKeyboardButton(text="Назад к целям", callback_data=f"builds:back:goal:{game}")],
+            [InlineKeyboardButton(text="Домой", callback_data="menu:home")],
         ]
     )
 
@@ -242,7 +248,8 @@ def build_playstyle_keyboard(game: str, goal: str, budget_tier: str) -> InlineKe
             [InlineKeyboardButton(text="Спокойный / живучий", callback_data=f"builds:playstyle:{game}:{goal}:{budget_tier}:safe")],
             [InlineKeyboardButton(text="Боссинг", callback_data=f"builds:playstyle:{game}:{goal}:{budget_tier}:boss")],
             [InlineKeyboardButton(text="Универсальный", callback_data=f"builds:playstyle:{game}:{goal}:{budget_tier}:allround")],
-            [InlineKeyboardButton(text="Назад", callback_data=f"builds:back:budget:{game}:{goal}")],
+            [InlineKeyboardButton(text="Назад к бюджету", callback_data=f"builds:back:budget:{game}:{goal}")],
+            [InlineKeyboardButton(text="Домой", callback_data="menu:home")],
         ]
     )
 
@@ -265,6 +272,7 @@ def build_recommendation_list_keyboard(
     ]
     rows.append([InlineKeyboardButton(text="Назад к стилю", callback_data=f"builds:back:playstyle:{game}:{goal}:{budget_tier}")])
     rows.append([InlineKeyboardButton(text="Назад к бюджету", callback_data=f"builds:back:budget:{game}:{goal}")])
+    rows.append([InlineKeyboardButton(text="Домой", callback_data="menu:home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -296,6 +304,7 @@ def build_detail_keyboard(
     rows.append([InlineKeyboardButton(text="Назад к подборке", callback_data=f"builds:back:list:{game}:{goal}:{budget_tier}:{playstyle}")])
     rows.append([InlineKeyboardButton(text="Назад к стилю", callback_data=f"builds:back:playstyle:{game}:{goal}:{budget_tier}")])
     rows.append([InlineKeyboardButton(text="Назад к бюджету", callback_data=f"builds:back:budget:{game}:{goal}")])
+    rows.append([InlineKeyboardButton(text="Домой", callback_data="menu:home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -304,6 +313,7 @@ def add_entry_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="Поиск по названию", callback_data="add:mode:item")],
             [InlineKeyboardButton(text="Trade URL", callback_data="add:mode:trade_url")],
+            [InlineKeyboardButton(text="Домой", callback_data="menu:home")],
             [InlineKeyboardButton(text="Отмена", callback_data="add:cancel")],
         ]
     )
@@ -314,6 +324,7 @@ def game_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="POE 2", callback_data="add:game:poe2")],
             [InlineKeyboardButton(text="POE 1", callback_data="add:game:poe1")],
+            [InlineKeyboardButton(text="Домой", callback_data="menu:home")],
             [InlineKeyboardButton(text="Отмена", callback_data="add:cancel")],
         ]
     )
@@ -324,7 +335,8 @@ def league_keyboard(leagues: list[League]) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=league.name, callback_data=f"add:league:{league.id}")]
         for league in leagues
     ]
-    rows.append([InlineKeyboardButton(text="Назад", callback_data="add:back:game")])
+    rows.append([InlineKeyboardButton(text="Назад к играм", callback_data="add:back:game")])
+    rows.append([InlineKeyboardButton(text="Домой", callback_data="menu:home")])
     rows.append([InlineKeyboardButton(text="Отмена", callback_data="add:cancel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -335,7 +347,8 @@ def currency_presets_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Divine Orb", callback_data="add:preset_currency:divine_orb")],
             [InlineKeyboardButton(text="Exalted Orb", callback_data="add:preset_currency:exalted_orb")],
             [InlineKeyboardButton(text="Chaos Orb", callback_data="add:preset_currency:chaos_orb")],
-            [InlineKeyboardButton(text="Назад", callback_data="add:back:league")],
+            [InlineKeyboardButton(text="Назад к лигам", callback_data="add:back:league")],
+            [InlineKeyboardButton(text="Домой", callback_data="menu:home")],
             [InlineKeyboardButton(text="Отмена", callback_data="add:cancel")],
         ]
     )
@@ -347,7 +360,8 @@ def search_results_keyboard(results: list[str], query: str) -> InlineKeyboardMar
         for index, item_name in enumerate(results)
     ]
     rows.append([InlineKeyboardButton(text=f"Использовать: {query}", callback_data="add:item:exact")])
-    rows.append([InlineKeyboardButton(text="Назад", callback_data="add:back:league")])
+    rows.append([InlineKeyboardButton(text="Назад к лигам", callback_data="add:back:league")])
+    rows.append([InlineKeyboardButton(text="Домой", callback_data="menu:home")])
     rows.append([InlineKeyboardButton(text="Отмена", callback_data="add:cancel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -358,7 +372,8 @@ def threshold_currency_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Exalted (ex)", callback_data="add:currency:ex")],
             [InlineKeyboardButton(text="Chaos", callback_data="add:currency:chaos")],
             [InlineKeyboardButton(text="Divine", callback_data="add:currency:div")],
-            [InlineKeyboardButton(text="Назад", callback_data="add:back:item")],
+            [InlineKeyboardButton(text="Назад к предмету", callback_data="add:back:item")],
+            [InlineKeyboardButton(text="Домой", callback_data="menu:home")],
             [InlineKeyboardButton(text="Отмена", callback_data="add:cancel")],
         ]
     )
@@ -370,5 +385,6 @@ def duplicate_resolution_keyboard(items: list[TrackedItem]) -> InlineKeyboardMar
         for item in items
     ]
     rows.append([InlineKeyboardButton(text="Создать новый", callback_data="add:resolve:create")])
+    rows.append([InlineKeyboardButton(text="Домой", callback_data="menu:home")])
     rows.append([InlineKeyboardButton(text="Отмена", callback_data="add:cancel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
