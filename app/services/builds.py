@@ -48,6 +48,202 @@ class BuildRecommendation:
     atlas_url: str | None = None
     source_note: str | None = None
 
+    @property
+    def main_skill_setup(self) -> tuple[str, ...]:
+        return BUILD_GEM_SETUPS.get(self.title, {}).get("main", ())
+
+    @property
+    def utility_setup(self) -> tuple[str, ...]:
+        return BUILD_GEM_SETUPS.get(self.title, {}).get("utility", ())
+
+    @property
+    def defensive_setup(self) -> tuple[str, ...]:
+        return BUILD_GEM_SETUPS.get(self.title, {}).get("defense", ())
+
+    @property
+    def support_priorities(self) -> tuple[str, ...]:
+        return BUILD_GEM_SETUPS.get(self.title, {}).get("supports", ())
+
+
+BUILD_GEM_SETUPS: dict[str, dict[str, tuple[str, ...]]] = {
+    "Lightning Arrow Deadeye": {
+        "main": (
+            "Lightning Arrow clear link",
+            "Artillery Ballista или второй single-target link на босса",
+            "Sniper's Mark как основной mark-инструмент по жирным целям",
+        ),
+        "utility": (
+            "Blink Arrow / movement skill для темпа карты",
+            "Frenzy setup или зарядка charge-слоя",
+            "Mark-on-hit только если не ломает single-target контроль",
+        ),
+        "defense": (
+            "Grace как базовый defensive anchor",
+            "Guard skill через automation/CWDT, если версия это тянет",
+            "Лайф-леч и suppress важнее лишнего paper DPS",
+        ),
+        "supports": (
+            "Сначала 6-link под clear consistency, потом усиливай boss link",
+            "Projectile / crit supports добавляй только после нормального лука",
+            "Не ломай Trinity/elemental consistency ради одной красивой цифры",
+        ),
+    },
+    "Hexblast Mines Trickster": {
+        "main": (
+            "Hexblast Mines как основной bossing и allround link",
+            "Curse setup, который стабильно кормит Hexblast",
+            "Mine detonation rhythm должен ощущаться гладко, без рваного окна",
+        ),
+        "utility": (
+            "Wither / exposure / дополнительная curse utility по версии билда",
+            "Movement skill без перегруза по mana cost",
+            "Automation для mines только если не теряешь контроль на боссах",
+        ),
+        "defense": (
+            "Grace или другой evade/suppress слой",
+            "Guard skill и recovery, которые не сбивают темп mine-цикла",
+            "Chaos res и suppress закрывай до luxury curse tech",
+        ),
+        "supports": (
+            "Приоритет: mine damage / crit consistency / уровни камней",
+            "Throw speed support ценнее, чем кажется, если билд ощущается вязким",
+            "Single-target links усиливай после базовой защиты и sustain",
+        ),
+    },
+    "Righteous Fire Chieftain": {
+        "main": (
+            "Righteous Fire как map-clear anchor",
+            "Fire Trap как главный single-target инструмент",
+            "Auras и sustain setup должны сначала держать сам RF, потом уже урон",
+        ),
+        "utility": (
+            "Shield Charge / Frostblink для feel и reposition",
+            "Flammability / exposure utility для жирных целей",
+            "Life regen utility важнее лишней кнопки в ротации",
+        ),
+        "defense": (
+            "Purity of Fire и max fire res backbone",
+            "Vitality / regen support там, где билд ещё сырой",
+            "Armour слой держи стабильным до упора в luxury damage",
+        ),
+        "supports": (
+            "Сначала sustain RF, потом масштабируй Fire Trap и burning damage",
+            "Support-камни, которые дают uptime и radius, часто полезнее голого DPS",
+            "Не режь защитные ауры ради раннего damage greed",
+        ),
+    },
+    "Spark Stormweaver": {
+        "main": (
+            "Spark как основной clear и allround link",
+            "Второй приоритет — shock/crit или projectile scaling по версии билда",
+            "Orb/trigger utility для босса только если не ломает mana feel",
+        ),
+        "utility": (
+            "Conductivity или другая lightning utility под жирные цели",
+            "Movement skill с коротким recovery окном",
+            "Mana sustain button/tech держи простой и предсказуемой",
+        ),
+        "defense": (
+            "Arcane Cloak или аналогичный mana-to-defense слой",
+            "Energy Shield или life-слой без дыр по резистам",
+            "Не убирай defensive utility ради одной offensive поддержки",
+        ),
+        "supports": (
+            "Приоритет: cast speed / projectile value / shock consistency",
+            "Плюс к уровням и хороший weapon/focus важнее экзотического support-swap",
+            "Single-target усиливай после того, как Spark уже приятно спамится на карте",
+        ),
+    },
+    "Ice Strike Monk": {
+        "main": (
+            "Ice Strike как основной melee link",
+            "Отдельный single-target акцент через cold/crit support-слой",
+            "Clear feel должен держаться без постоянного провала по tempo",
+        ),
+        "utility": (
+            "Movement и engage tool для безопасного входа в pack",
+            "Mark/utility под редких и боссов",
+            "Freeze/chill utility хороша, если не разваливает sustain",
+        ),
+        "defense": (
+            "Evasion/ES слой и recovery под melee-входы",
+            "Defensive automation/guard слой держи стабильным",
+            "Сначала survive вблизи, потом luxury cold scaling",
+        ),
+        "supports": (
+            "Приоритет: weapon feel / attack speed / cold scaling",
+            "AoE/clear support не режь слишком рано ради boss-only цифр",
+            "Crit и penetration добирай после нормального defensive скелета",
+        ),
+    },
+    "Minion Infernalist": {
+        "main": (
+            "Основной summon setup с упором в уровни minion gems",
+            "Один понятный single-target summon/command слой под боссов",
+            "Summon loop должен быть простым, без лишней кнопочной перегрузки",
+        ),
+        "utility": (
+            "Offering / curse / reposition utility по версии билда",
+            "Spirit-экономика важнее красивого лишнего миньона",
+            "Utility summon держи только если он реально добавляет uptime",
+        ),
+        "defense": (
+            "Свой defensive слой не жертвуй ради чисто миньон-урона",
+            "Recovery и safe positioning должны быть скучно-надежными",
+            "Resists и life/ES закрой до luxury minion tech",
+        ),
+        "supports": (
+            "Приоритет: уровни миньонов / spirit comfort / reliable uptime",
+            "Damage supports добавляй после того, как summon loop уже не раздражает",
+            "Не дроби setup на слишком много полу-полезных summon-кнопок",
+        ),
+    },
+    "Gas Arrow Huntress": {
+        "main": (
+            "Gas Arrow как основной pressure link",
+            "Single-target слой под ядро chaos/poison версии",
+            "Bossing setup должен держать uptime, а не только burst на бумаге",
+        ),
+        "utility": (
+            "Mark под жирные цели и boss rush",
+            "Movement setup для clean reposition",
+            "Clear utility оставляй только если она реально ускоряет карты",
+        ),
+        "defense": (
+            "Evasion/positioning backbone обязателен",
+            "Recovery и sustain важнее одной лишней offensive кнопки",
+            "Не собирай билд в чистое стекло ради single-target витрины",
+        ),
+        "supports": (
+            "Приоритет: bow quality / uptime / chaos or poison scaling",
+            "Single-target multipliers добавляй после нормального лука и защиты",
+            "Support-слой должен помогать держать pressure, а не ломать ротацию",
+        ),
+    },
+    "Titan Slam Warrior": {
+        "main": (
+            "Основной slam link с heavy-hit акцентом",
+            "Отдельный bossing pressure слой, если версия билда это использует",
+            "Rotation feel должен быть медленным, но уверенным, без пустых окон",
+        ),
+        "utility": (
+            "Warcry utility для тяжелых ударов и sustain",
+            "Movement tool, который не ломает ритм melee-билда",
+            "Banner/utility layer только если он реально поддерживает endgame fights",
+        ),
+        "defense": (
+            "Armour и anti-one-shot слой обязательны",
+            "Recovery держи на виду, потому что билд играет от толстоты",
+            "Defensive utility не режь ради раннего жадного physical scaling",
+        ),
+        "supports": (
+            "Приоритет: weapon DPS / heavy hit value / rotation comfort",
+            "Сначала сделай slam приятным, потом уже максимизируй ceiling удара",
+            "Чисто boss-only supports не должны ломать карту и feel прогресса",
+        ),
+    },
+}
+
 
 class BuildService:
     _catalog: tuple[BuildRecommendation, ...] = (

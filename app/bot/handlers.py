@@ -554,20 +554,37 @@ def build_recommendation_detail_text(
         f"Класс: {recommendation.class_name}",
         f"Ядро: {recommendation.core_skill}",
         recommendation.summary,
-        *(["Источник/референсы: " + recommendation.source_note] if recommendation.source_note else []),
+        *(
+            ["Референсы: кнопки planner / guide / tree / atlas ниже."]
+            if (recommendation.planner_url or recommendation.guide_url or recommendation.tree_url or recommendation.atlas_url)
+            else []
+        ),
         f"Примерный бюджет: {recommendation.budget_estimate}",
         f"Покупать в первую очередь: {', '.join(recommendation.buy_priority)}",
         f"Какие статы добирать: {', '.join(recommendation.stat_targets)}",
-        f"Первые апгрейды: {', '.join(recommendation.first_upgrades)}",
         f"Дерево / приоритеты прокачки: {', '.join(recommendation.tree_focus)}",
         f"Атлас / направление фарма: {', '.join(recommendation.atlas_focus)}",
         f"Что этим билдом фармить: {', '.join(recommendation.farm_mechanics)}",
         "Эндгейм-чеклист по слотам:",
         *[f"  - {entry}" for entry in recommendation.endgame_slot_checklist],
         f"Эндгейм-цели: {', '.join(recommendation.endgame_goals)}",
-        f"Chase-апгрейды: {', '.join(recommendation.chase_upgrades)}",
-        f"Если хочется похожее, но по-другому: {recommendation.alternative_hint}",
     ]
+
+    if (
+        recommendation.main_skill_setup
+        or recommendation.utility_setup
+        or recommendation.defensive_setup
+        or recommendation.support_priorities
+    ):
+        lines.append("Gem setup:")
+        if recommendation.main_skill_setup:
+            lines.append(f"  - Main: {'; '.join(recommendation.main_skill_setup[:2])}")
+        if recommendation.utility_setup:
+            lines.append(f"  - Utility: {'; '.join(recommendation.utility_setup[:2])}")
+        if recommendation.defensive_setup:
+            lines.append(f"  - Defense: {'; '.join(recommendation.defensive_setup[:2])}")
+        if recommendation.support_priorities:
+            lines.append(f"  - Supports: {'; '.join(recommendation.support_priorities[:2])}")
 
     if recommendation.gear_sheet:
         lines.append("Gear sheet по слотам:")
