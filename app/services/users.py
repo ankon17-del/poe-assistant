@@ -22,3 +22,13 @@ class UserService:
         self.session.add(user)
         await self.session.flush()
         return user
+
+    async def set_language(self, telegram_id: int, language: str) -> User:
+        user = await self.get_by_telegram_id(telegram_id)
+        if user is None:
+            user = User(telegram_id=telegram_id, language=language)
+            self.session.add(user)
+        else:
+            user.language = language
+        await self.session.flush()
+        return user

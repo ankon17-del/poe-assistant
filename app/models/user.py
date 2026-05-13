@@ -13,6 +13,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
     username: Mapped[str | None] = mapped_column(String(128))
+    language: Mapped[str | None] = mapped_column(String(8), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     subscription_type: Mapped[SubscriptionType] = mapped_column(
         Enum(SubscriptionType, name="subscription_type"),

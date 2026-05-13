@@ -10,6 +10,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from app.bot.dependencies import session_scope
+from app.bot.i18n import DEFAULT_LOCALE, LANGUAGE_NAMES, normalize_locale, tr
 from app.bot.keyboards import (
     add_entry_keyboard,
     account_keyboard,
@@ -23,6 +24,7 @@ from app.bot.keyboards import (
     duplicate_resolution_keyboard,
     game_keyboard,
     league_keyboard,
+    language_keyboard,
     home_menu_keyboard,
     menu_section_keyboard,
     paused_alerts_keyboard,
@@ -71,6 +73,14 @@ class AddTrackingStates(StatesGroup):
 
 async def ensure_user(session, telegram_id: int, username: str | None):
     return await UserService(session).get_or_create(telegram_id=telegram_id, username=username)
+
+
+async def load_user_locale(telegram_id: int, username: str | None, telegram_locale: str | None = None) -> str:
+    async with session_scope() as session:
+        user = await ensure_user(session, telegram_id, username)
+        if user.language:
+            return normalize_locale(user.language)
+    return normalize_locale(telegram_locale) if telegram_locale else DEFAULT_LOCALE
 
 
 def format_decimal(value: Decimal) -> str:
@@ -128,69 +138,89 @@ def build_paused_alerts_text(items: list) -> str:
     return "\n\n".join(lines)
 
 
-def build_account_text(*, integration, oauth_config_error: str | None) -> str:
-    lines = ["Аккаунт"]
+def build_account_text(*, integration, oauth_config_error: str | None, locale: str = DEFAULT_LOCALE) -> str:
+    title = {"ru": "Аккаунт", "en": "Account", "fr": "Compte", "de": "Konto"}.get(locale, "Account")
+    connected = {"ru": "Статус: подключён", "en": "Status: connected", "fr": "Statut : connecté", "de": "Status: verbunden"}.get(locale, "Status: connected")
+    disconnected = {"ru": "Статус: не подключён", "en": "Status: not connected", "fr": "Statut : non connecté", "de": "Status: nicht verbunden"}.get(locale, "Status: not connected")
+    account_label = {"ru": "Аккаунт", "en": "Account", "fr": "Compte", "de": "Konto"}.get(locale, "Account")
+    oauth_unavailable = {"ru": "OAuth сейчас недоступен", "en": "OAuth is currently unavailable", "fr": "OAuth est actuellement indisponible", "de": "OAuth ist derzeit nicht verfügbar"}.get(locale, "OAuth is currently unavailable")
+    connected_hint = {"ru": "Можно обновить статус или отключить привязку ниже.", "en": "You can refresh the status or disconnect below.", "fr": "Tu peux actualiser le statut ou déconnecter le compte ci-dessous.", "de": "Du kannst unten den Status aktualisieren oder die Verbindung trennen."}.get(locale, "")
+    disconnected_hint = {"ru": "Нажми кнопку ниже, чтобы привязать аккаунт Path of Exile к Telegram.", "en": "Use the button below to connect your Path of Exile account to Telegram.", "fr": "Utilise le bouton ci-dessous pour connecter ton compte Path of Exile à Telegram.", "de": "Nutze den Button unten, um dein Path of Exile-Konto mit Telegram zu verbinden."}.get(locale, "")
+    lines = [title]
     if integration:
-        lines.append("Статус: подключён")
+        lines.append(connected)
         if integration.external_account_name:
-            lines.append(f"Аккаунт: {integration.external_account_name}")
+            lines.append(f"{account_label}: {integration.external_account_name}")
         if integration.scopes:
             lines.append(f"Scopes: {integration.scopes}")
     else:
-        lines.append("Статус: не подключён")
+        lines.append(disconnected)
 
     if oauth_config_error:
         lines.append("")
-        lines.append(f"OAuth сейчас недоступен: {oauth_config_error}")
+        lines.append(f"{oauth_unavailable}: {oauth_config_error}")
     elif integration:
         lines.append("")
-        lines.append("Можно обновить статус или отключить привязку ниже.")
+        lines.append(connected_hint)
     else:
         lines.append("")
-        lines.append("Нажми кнопку ниже, чтобы привязать аккаунт Path of Exile к Telegram.")
+        lines.append(disconnected_hint)
 
     return "\n".join(lines)
 
 
-def build_stash_text(summary) -> str:
-    lines = ["Тайник", ""]
+def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
+    title = {"ru": "Тайник", "en": "Stash", "fr": "Coffre", "de": "Stash"}.get(locale, "Stash")
+    account_connected = {"ru": "PoE аккаунт: подключён", "en": "PoE account: connected", "fr": "Compte PoE : connecté", "de": "PoE-Konto: verbunden"}.get(locale, "PoE account: connected")
+    account_not_connected = {"ru": "PoE аккаунт: пока не подключён", "en": "PoE account: not connected yet", "fr": "Compte PoE : pas encore connecté", "de": "PoE-Konto: noch nicht verbunden"}.get(locale, "PoE account: not connected yet")
+    blocker_label = {"ru": "Блокер OAuth", "en": "OAuth blocker", "fr": "Blocage OAuth", "de": "OAuth-Blocker"}.get(locale, "OAuth blocker")
+    readiness = {"ru": "Статус готовности:", "en": "Readiness status:", "fr": "État de préparation :", "de": "Bereitschaftsstatus:"}.get(locale, "Readiness status:")
+    upcoming = {"ru": "Что здесь появится:", "en": "What will appear here:", "fr": "Ce qui apparaîtra ici :", "de": "Was hier erscheinen wird:"}.get(locale, "What will appear here:")
+    next_steps = {"ru": "Следующие шаги:", "en": "Next steps:", "fr": "Étapes suivantes :", "de": "Nächste Schritte:"}.get(locale, "Next steps:")
+    footer = {
+        "ru": "Phase 6 уже начата: UX и сервисный фундамент готовы, дальше нам нужны account-data и stash-scopes.",
+        "en": "Phase 6 has already started: the UX and service foundation are ready, and the next step needs account data and stash scopes.",
+        "fr": "La phase 6 a déjà commencé : l'UX et la base de services sont prêtes, et la suite dépend des données de compte et des scopes de coffre.",
+        "de": "Phase 6 hat bereits begonnen: UX und Service-Fundament stehen, und als Nächstes brauchen wir Account-Daten und Stash-Scopes.",
+    }.get(locale, "")
+    lines = [title, ""]
 
     if summary.account_connected:
         if summary.account_name:
-            lines.append(f"PoE аккаунт: подключён ({summary.account_name})")
+            lines.append(f"{account_connected} ({summary.account_name})")
         else:
-            lines.append("PoE аккаунт: подключён")
+            lines.append(account_connected)
     else:
-        lines.append("PoE аккаунт: пока не подключён")
+        lines.append(account_not_connected)
 
     if summary.approved_scopes:
         lines.append(f"Scopes: {' '.join(summary.approved_scopes)}")
 
     if summary.oauth_blocker:
-        lines.append(f"Блокер OAuth: {summary.oauth_blocker}")
+        lines.append(f"{blocker_label}: {summary.oauth_blocker}")
 
     lines.append("")
-    lines.append("Статус готовности:")
+    lines.append(readiness)
     for item in summary.statuses:
         lines.append(f"- {item.title}: {item.status}")
         lines.append(f"  {item.detail}")
 
     lines.append("")
-    lines.append("Что здесь появится:")
+    lines.append(upcoming)
     for insight in summary.upcoming_insights:
         lines.append(f"- {insight}")
 
     lines.append("")
-    lines.append("Следующие шаги:")
+    lines.append(next_steps)
     for step in summary.next_steps:
         lines.append(f"- {step}")
 
     lines.append("")
-    lines.append("Phase 6 уже начата: UX и сервисный фундамент готовы, дальше нам нужны account-data и stash-scopes.")
+    lines.append(footer)
     return "\n".join(lines)
 
 
-def build_stash_guide_text(guide) -> str:
+def build_stash_guide_text(guide, locale: str = DEFAULT_LOCALE) -> str:
     lines = [
         f"Stash assistant · {guide.title}",
         "",
@@ -201,7 +231,13 @@ def build_stash_guide_text(guide) -> str:
         lines.append(section_title)
         lines.extend(f"- {bullet}" for bullet in bullets)
     lines.append("")
-    lines.append("Это ручной playbook: уже полезно без OAuth, а потом мы наложим на него живой stash-scan и автоматические инсайты.")
+    footer = {
+        "ru": "Это ручной playbook: уже полезно без OAuth, а потом мы наложим на него живой stash-scan и автоматические инсайты.",
+        "en": "This is a manual playbook: useful even without OAuth today, and later we can layer live stash scans and automatic insights on top.",
+        "fr": "Ceci est un playbook manuel : déjà utile sans OAuth aujourd'hui, et plus tard on pourra y superposer un scan vivant du coffre et des insights automatiques.",
+        "de": "Das ist ein manuelles Playbook: schon heute ohne OAuth nützlich, und später können wir Live-Stash-Scans und automatische Insights darauf legen.",
+    }.get(locale, "")
+    lines.append(footer)
     return "\n".join(lines)
 
 
@@ -321,136 +357,92 @@ def build_template_activation_text(result, league) -> str:
     return "\n".join(lines)
 
 
-def build_assistant_intro_text() -> str:
+def build_assistant_intro_text(locale: str = DEFAULT_LOCALE) -> str:
+    return tr(locale, "assistant_intro")
+
+
+def build_home_text(locale: str = DEFAULT_LOCALE) -> str:
     return (
-        "Build assistant:\n\n"
-        "Помогу подобрать стартовое направление под игру, бюджет и стиль.\n"
-        "Сначала выбери POE 1 или POE 2."
+        f"{tr(locale, 'welcome_title')}\n\n"
+        f"{tr(locale, 'welcome_body')}\n\n"
+        f"{tr(locale, 'welcome_features')}\n"
+        f"- {tr(locale, 'welcome_feature_templates')}\n"
+        f"- {tr(locale, 'welcome_feature_economy')}\n"
+        f"- {tr(locale, 'welcome_feature_builds')}\n"
+        f"- {tr(locale, 'welcome_feature_tracking')}\n"
+        f"- {tr(locale, 'welcome_feature_account')}"
     )
 
 
-def build_home_text() -> str:
+def build_menu_help_text(locale: str = DEFAULT_LOCALE) -> str:
     return (
-        "POE Assistant\n\n"
-        "Открой нужный раздел через меню ниже.\n\n"
-        "Что уже можно делать:\n"
-        "- шаблоны для быстрых сетапов\n"
-        "- экономика и currency alerts\n"
-        "- билды с planner / guide / tree\n"
-        "- трекинг и alerts под рукой\n"
-        "- аккаунт и тайник готовы к расширению после ответа GGG"
+        f"{tr(locale, 'help_title')}:\n\n"
+        f"{tr(locale, 'help_line_menu')}\n"
+        f"{tr(locale, 'help_line_add')}\n"
+        f"{tr(locale, 'help_line_templates')}\n"
+        f"{tr(locale, 'help_line_economy')}\n"
+        f"{tr(locale, 'help_line_builds')}\n"
+        f"{tr(locale, 'help_line_list')}\n"
+        f"{tr(locale, 'help_line_alerts')}\n"
+        f"{tr(locale, 'help_line_account')}\n"
+        f"{tr(locale, 'help_line_stash')}\n"
+        f"{tr(locale, 'help_line_stats')}\n"
+        f"{tr(locale, 'help_line_settings')}"
     )
 
 
-def build_menu_help_text() -> str:
-    return (
-        "Навигация:\n\n"
-        "/menu или /start — главный экран\n"
-        "/add — добавить watcher вручную\n"
-        "/templates — готовые сетапы\n"
-        "/economy — рынок и currency alerts\n"
-        "/builds — подбор билдов\n"
-        "/list — активный трекинг\n"
-        "/alerts — сработавшие alerts\n"
-        "/account — привязка PoE-аккаунта\n"
-        "/stash — stash-панель\n"
-        "/stats — статистика\n"
-        "/settings — текущие MVP-настройки"
-    )
+def build_templates_section_text(locale: str = DEFAULT_LOCALE) -> str:
+    return f"{tr(locale, 'section_templates_title')}\n\n{tr(locale, 'section_templates_body')}"
 
 
-def build_templates_section_text() -> str:
-    return (
-        "Шаблоны\n\n"
-        "Готовые наборы watcher'ов под игру, цель и стратегию.\n"
-        "Подходят для быстрого старта без ручной сборки сетапа."
-    )
+def build_economy_section_text(locale: str = DEFAULT_LOCALE) -> str:
+    return f"{tr(locale, 'section_economy_title')}\n\n{tr(locale, 'section_economy_body')}"
 
 
-def build_economy_section_text() -> str:
-    return (
-        "Экономика\n\n"
-        "Здесь у нас рынок, currency alerts и быстрый обзор движения валют.\n"
-        "Можно открыть полный dashboard или сразу перейти к сработавшим alerts."
-    )
+def build_builds_section_text(locale: str = DEFAULT_LOCALE) -> str:
+    return f"{tr(locale, 'section_builds_title')}\n\n{tr(locale, 'section_builds_body')}"
 
 
-def build_builds_section_text() -> str:
-    return (
-        "Билды\n\n"
-        "Подбор билдов по игре, цели, бюджету и стилю.\n"
-        "Внутри есть planner, guide, tree, atlas и endgame-подсказки."
-    )
+def build_tracking_section_text(locale: str = DEFAULT_LOCALE) -> str:
+    return f"{tr(locale, 'section_tracking_title')}\n\n{tr(locale, 'section_tracking_body')}"
 
 
-def build_tracking_section_text() -> str:
-    return (
-        "Трекинг\n\n"
-        "Управление активными watcher'ами и быстрый вход в мастер добавления.\n"
-        "Если что-то уже сработало, отсюда же удобно перейти в alerts."
-    )
+def build_account_section_text(locale: str = DEFAULT_LOCALE) -> str:
+    return f"{tr(locale, 'section_account_title')}\n\n{tr(locale, 'section_account_body')}"
 
 
-def build_account_section_text() -> str:
-    return (
-        "Аккаунт\n\n"
-        "Панель привязки PoE-аккаунта и состояние интеграции.\n"
-        "Сейчас это foundation-слой, который ждёт ответ GGG для полного раскрытия."
-    )
+def build_stash_section_text(locale: str = DEFAULT_LOCALE) -> str:
+    return f"{tr(locale, 'section_stash_title')}\n\n{tr(locale, 'section_stash_body')}"
 
 
-def build_stash_section_text() -> str:
-    return (
-        "Тайник\n\n"
-        "Stash-панель и readiness под будущий реальный stash-analysis.\n"
-        "До ответа GGG здесь держим основу и навигацию к связанным функциям."
-    )
-
-
-def build_tracking_result_text(item, action: str) -> str:
-    lines = [f"{action} · #{item.id} {item.item_name}"]
+def build_tracking_result_text(item, action: str, locale: str = DEFAULT_LOCALE) -> str:
+    lines = [f"{action} ? #{item.id} {item.item_name}"]
     if item.league:
         game_label = "POE 2" if item.league.realm == "poe2" else "POE 1"
         lines.append(f"{game_label} / {item.league.name}")
     if item.target_price is not None:
-        lines.append(f"Порог: {format_decimal(Decimal(item.target_price))} {item.target_currency}")
+        lines.append(f"Threshold: {format_decimal(Decimal(item.target_price))} {item.target_currency}")
     if item.trade_url:
-        lines.append("Источник: trade URL")
+        lines.append("Source: trade URL")
     return "\n".join(lines)
 
 
-def build_goal_prompt_text(game: str) -> str:
+def build_goal_prompt_text(game: str, locale: str = DEFAULT_LOCALE) -> str:
     game_label = BuildService.game_label(game)
-    return (
-        f"Build assistant · {game_label}\n\n"
-        "Какая у тебя сейчас главная цель?"
-    )
+    return tr(locale, "build_goal_prompt", game=game_label)
 
 
-def build_budget_prompt_text(game: str, goal: str) -> str:
+def build_budget_prompt_text(game: str, goal: str, locale: str = DEFAULT_LOCALE) -> str:
     game_label = BuildService.game_label(game)
     goal_label = BuildService.goal_label(goal)
-    return (
-        f"Build assistant · {game_label}\n\n"
-        f"Цель: {goal_label}\n"
-        "\n"
-        "Теперь выбери бюджетный уровень. Это не точная валюта, а скорее стадия готовности:\n"
-        "- стартовый\n"
-        "- средний\n"
-        "- высокий"
-    )
+    return tr(locale, "build_budget_prompt", game=game_label, goal=goal_label)
 
 
-def build_playstyle_prompt_text(game: str, goal: str, budget_tier: str) -> str:
+def build_playstyle_prompt_text(game: str, goal: str, budget_tier: str, locale: str = DEFAULT_LOCALE) -> str:
     game_label = BuildService.game_label(game)
     goal_label = BuildService.goal_label(goal)
     budget_label = BuildService.budget_label(budget_tier)
-    return (
-        f"Build assistant · {game_label}\n"
-        f"Цель: {goal_label}\n"
-        f"Бюджет: {budget_label}\n\n"
-        "Какой стиль тебе ближе?"
-    )
+    return tr(locale, "build_playstyle_prompt", game=game_label, goal=goal_label, budget=budget_label)
 
 
 def build_recommendations_overview_text(
@@ -823,10 +815,11 @@ async def finish_wizard(
     await state.clear()
 
 
-async def load_account_panel(telegram_id: int, username: str | None) -> tuple[str, object]:
+async def load_account_panel(telegram_id: int, username: str | None, telegram_locale: str | None = None) -> tuple[str, object]:
     async with session_scope() as session:
         user = await ensure_user(session, telegram_id, username)
         integration = await IntegrationService(session).get_by_type(user, IntegrationType.poe_oauth)
+        locale = normalize_locale(user.language or telegram_locale or DEFAULT_LOCALE)
 
     oauth_service = PoeOAuthService()
     connect_url: str | None = None
@@ -836,15 +829,16 @@ async def load_account_panel(telegram_id: int, username: str | None) -> tuple[st
     except PoeOAuthConfigError as exc:
         oauth_config_error = str(exc)
 
-    text = build_account_text(integration=integration, oauth_config_error=oauth_config_error)
-    keyboard = account_keyboard(connect_url=connect_url, is_connected=integration is not None)
+    text = build_account_text(integration=integration, oauth_config_error=oauth_config_error, locale=locale)
+    keyboard = account_keyboard(connect_url=connect_url, is_connected=integration is not None, locale=locale)
     return text, keyboard
 
 
-async def load_stash_panel(telegram_id: int, username: str | None) -> tuple[str, object]:
+async def load_stash_panel(telegram_id: int, username: str | None, telegram_locale: str | None = None) -> tuple[str, object]:
     async with session_scope() as session:
         user = await ensure_user(session, telegram_id, username)
         summary = await StashService(session).get_panel_summary(user)
+        locale = normalize_locale(user.language or telegram_locale or DEFAULT_LOCALE)
 
     connect_url = None
     if summary.oauth_available and not summary.account_connected:
@@ -854,68 +848,81 @@ async def load_stash_panel(telegram_id: int, username: str | None) -> tuple[str,
         except PoeOAuthConfigError:
             connect_url = None
 
-    return build_stash_text(summary), stash_keyboard(connect_url=connect_url, account_connected=summary.account_connected)
+    return build_stash_text(summary, locale), stash_keyboard(connect_url=connect_url, account_connected=summary.account_connected, locale=locale)
 
 
-async def load_tracking_panel(telegram_id: int, username: str | None) -> tuple[str, object]:
+async def load_tracking_panel(telegram_id: int, username: str | None, telegram_locale: str | None = None) -> tuple[str, object]:
     async with session_scope() as session:
         user = await ensure_user(session, telegram_id, username)
         items = await TrackingService(session).list_items(user)
+        locale = normalize_locale(user.language or telegram_locale or DEFAULT_LOCALE)
 
     if not items:
-        return "Активного трекинга пока нет. Добавь предмет через /add.", menu_section_keyboard(("Добавить трекинг", "menu:add"))
-    return build_tracking_list_text(items), with_home_button(tracking_actions_keyboard(items))
+        empty_text = (
+            "No active tracking yet. Use /add to create your first watcher."
+            if locale != 'ru'
+            else "????????? ???????? ???? ???. ?????? ??????? ????? /add."
+        )
+        return empty_text, menu_section_keyboard((tr(locale, 'add_tracking'), 'menu:add'), locale=locale)
+    return build_tracking_list_text(items), with_home_button(tracking_actions_keyboard(items, locale=locale), locale=locale)
 
 
-async def load_alerts_panel(telegram_id: int, username: str | None) -> tuple[str, object]:
+async def load_alerts_panel(telegram_id: int, username: str | None, telegram_locale: str | None = None) -> tuple[str, object]:
     async with session_scope() as session:
         user = await ensure_user(session, telegram_id, username)
         items = await TrackingService(session).list_paused_price_alerts(user)
+        locale = normalize_locale(user.language or telegram_locale or DEFAULT_LOCALE)
 
     if not items:
-        return (
-            "Сработавших price alerts пока нет.\n\n"
-            "Когда alert сработает, он появится здесь, и его можно будет быстро перезапустить.",
-            menu_section_keyboard(("Открыть экономику", "menu:economy")),
+        empty_text = (
+            "No triggered price alerts yet. When an alert fires, it will appear here so you can restart it quickly."
+            if locale != 'ru'
+            else "??????????? price alerts ???? ???. ????? alert ?????????, ?? ???????? ?????, ? ??? ????? ????? ?????? ?????????????."
         )
-    return build_paused_alerts_text(items), with_home_button(paused_alerts_keyboard(items))
+        return empty_text, menu_section_keyboard((tr(locale, 'open_economy'), 'menu:economy'), locale=locale)
+    return build_paused_alerts_text(items), with_home_button(paused_alerts_keyboard(items, locale=locale), locale=locale)
 
 
-async def load_economy_panel(telegram_id: int, username: str | None) -> tuple[str, object]:
+async def load_economy_panel(telegram_id: int, username: str | None, telegram_locale: str | None = None) -> tuple[str, object]:
     async with session_scope() as session:
         user = await ensure_user(session, telegram_id, username)
         summaries, overview = await EconomyService(session).get_user_economy_dashboard(user)
+        locale = normalize_locale(user.language or telegram_locale or DEFAULT_LOCALE)
 
     return build_economy_text(summaries, overview), menu_section_keyboard(
-        ("Обновить экономику", "menu:economy"),
-        ("Открыть alerts", "menu:alerts"),
+        ("Refresh economy" if locale != 'ru' else "???????? ?????????", 'menu:economy'),
+        ("Open alerts" if locale != 'ru' else "??????? alerts", 'menu:alerts'),
+        locale=locale,
     )
 
 
 async def answer_home_screen(message: Message) -> None:
     async with session_scope() as session:
-        await ensure_user(session, message.from_user.id, message.from_user.username)
-    await message.answer(build_home_text(), reply_markup=home_menu_keyboard())
+        user = await ensure_user(session, message.from_user.id, message.from_user.username)
+    locale = normalize_locale(user.language or message.from_user.language_code or DEFAULT_LOCALE)
+    if not user.language:
+        await message.answer(tr(locale, 'start_language_first'), reply_markup=language_keyboard(locale, back_callback='menu:home'))
+        return
+    await message.answer(build_home_text(locale), reply_markup=home_menu_keyboard(locale))
 
 
 async def edit_home_screen(callback: CallbackQuery) -> None:
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
-        await callback.message.edit_text(build_home_text(), reply_markup=home_menu_keyboard())
+        await callback.message.edit_text(build_home_text(locale), reply_markup=home_menu_keyboard(locale))
     await callback.answer()
 
 
 async def begin_add_wizard(message: Message, state: FSMContext) -> None:
+    locale = await load_user_locale(message.from_user.id, message.from_user.username, message.from_user.language_code)
     await state.clear()
     await state.set_state(AddTrackingStates.choosing_mode)
     await show_wizard_message(
         state=state,
         bot=message.bot,
         chat_id=message.chat.id,
-        text=(
-            "Новый трекинг\n\n"
-            "Шаг 1/4: выбери тип источника."
-        ),
-        reply_markup=add_entry_keyboard(),
+        text=f"{tr(locale, 'wizard_new_tracking')}\n\n{tr(locale, 'wizard_step_source')}",
+        reply_markup=add_entry_keyboard(locale),
     )
 
 
@@ -976,13 +983,14 @@ async def finalize_tracking_creation(
 
     item = result.item
     action_text = "Обновлён трекинг" if result.action == "updated" else "Добавлен трекинг"
+    locale = normalize_locale(user.language) if user.language else DEFAULT_LOCALE
 
     await finish_wizard(
         state=state,
         bot=bot,
         chat_id=chat_id,
-        text=build_tracking_result_text(item, action_text),
-        reply_markup=with_home_button(tracking_actions_keyboard([item])),
+        text=build_tracking_result_text(item, action_text, locale),
+        reply_markup=with_home_button(tracking_actions_keyboard([item], locale), locale=locale),
     )
 
 
@@ -998,7 +1006,11 @@ async def menu(message: Message) -> None:
 
 @router.message(Command("help"))
 async def help_command(message: Message) -> None:
-    await message.answer(build_menu_help_text(), reply_markup=menu_section_keyboard(("Открыть меню", "menu:home")))
+    locale = await load_user_locale(message.from_user.id, message.from_user.username, message.from_user.language_code)
+    await message.answer(
+        build_menu_help_text(locale),
+        reply_markup=menu_section_keyboard((tr(locale, "open_menu"), "menu:home"), locale=locale),
+    )
 
 
 @router.callback_query(F.data == "menu:home")
@@ -1008,22 +1020,25 @@ async def menu_home(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:help")
 async def menu_help(callback: CallbackQuery) -> None:
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
-            build_menu_help_text(),
-            reply_markup=menu_section_keyboard(("Домой", "menu:home"), include_home=False),
+            build_menu_help_text(locale),
+            reply_markup=menu_section_keyboard((tr(locale, "home"), "menu:home"), include_home=False, locale=locale),
         )
     await callback.answer()
 
 
 @router.callback_query(F.data == "menu:templates")
 async def menu_templates(callback: CallbackQuery) -> None:
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
-            build_templates_section_text(),
+            build_templates_section_text(locale),
             reply_markup=menu_section_keyboard(
-                ("Открыть шаблоны", "menu:templates:open"),
-                ("Добавить трекинг вручную", "menu:add"),
+                (tr(locale, "open_templates"), "menu:templates:open"),
+                (tr(locale, "manual_tracking"), "menu:add"),
+                locale=locale,
             ),
         )
     await callback.answer()
@@ -1031,13 +1046,15 @@ async def menu_templates(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:economy")
 async def menu_economy(callback: CallbackQuery) -> None:
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
-            build_economy_section_text(),
+            build_economy_section_text(locale),
             reply_markup=menu_section_keyboard(
-                ("Открыть обзор экономики", "menu:economy:open"),
-                ("Сработавшие alerts", "menu:alerts:open"),
-                ("Шаблоны рынка", "menu:templates:open"),
+                (tr(locale, "open_economy_dashboard"), "menu:economy:open"),
+                (tr(locale, "open_alerts"), "menu:alerts:open"),
+                (tr(locale, "market_templates"), "menu:templates:open"),
+                locale=locale,
             ),
         )
     await callback.answer()
@@ -1045,12 +1062,14 @@ async def menu_economy(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:builds")
 async def menu_builds(callback: CallbackQuery) -> None:
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
-            build_builds_section_text(),
+            build_builds_section_text(locale),
             reply_markup=menu_section_keyboard(
-                ("Подобрать билд", "menu:builds:open"),
-                ("Открыть шаблоны", "menu:templates:open"),
+                (tr(locale, "pick_build"), "menu:builds:open"),
+                (tr(locale, "open_templates"), "menu:templates:open"),
+                locale=locale,
             ),
         )
     await callback.answer()
@@ -1058,13 +1077,15 @@ async def menu_builds(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:tracking")
 async def menu_tracking(callback: CallbackQuery) -> None:
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
-            build_tracking_section_text(),
+            build_tracking_section_text(locale),
             reply_markup=menu_section_keyboard(
-                ("Активный трекинг", "menu:tracking:open"),
-                ("Добавить watcher", "menu:add"),
-                ("Сработавшие alerts", "menu:alerts:open"),
+                (tr(locale, "active_tracking"), "menu:tracking:open"),
+                (tr(locale, "add_tracking"), "menu:add"),
+                (tr(locale, "open_alerts"), "menu:alerts:open"),
+                locale=locale,
             ),
         )
     await callback.answer()
@@ -1072,12 +1093,14 @@ async def menu_tracking(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:alerts")
 async def menu_alerts(callback: CallbackQuery) -> None:
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
-            "Алерты\n\nСработавшие currency alerts, которые стоят на паузе и ждут перезапуска.",
+            f"{tr(locale, 'alerts_section_title')}\n\n{tr(locale, 'alerts_section_body')}",
             reply_markup=menu_section_keyboard(
-                ("Открыть alerts", "menu:alerts:open"),
-                ("Открыть экономику", "menu:economy:open"),
+                (tr(locale, "open_alerts"), "menu:alerts:open"),
+                (tr(locale, "open_economy"), "menu:economy:open"),
+                locale=locale,
             ),
         )
     await callback.answer()
@@ -1085,12 +1108,14 @@ async def menu_alerts(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:account")
 async def menu_account(callback: CallbackQuery) -> None:
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
-            build_account_section_text(),
+            build_account_section_text(locale),
             reply_markup=menu_section_keyboard(
-                ("Открыть панель аккаунта", "menu:account:open"),
-                ("Открыть тайник", "menu:stash:open"),
+                (tr(locale, "open_account_panel"), "menu:account:open"),
+                (tr(locale, "open_stash"), "menu:stash:open"),
+                locale=locale,
             ),
         )
     await callback.answer()
@@ -1098,12 +1123,14 @@ async def menu_account(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:stash")
 async def menu_stash(callback: CallbackQuery) -> None:
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
-            build_stash_section_text(),
+            build_stash_section_text(locale),
             reply_markup=menu_section_keyboard(
-                ("Открыть stash-панель", "menu:stash:open"),
-                ("Открыть аккаунт", "menu:account:open"),
+                (tr(locale, "open_stash_panel"), "menu:stash:open"),
+                (tr(locale, "open_account"), "menu:account:open"),
+                locale=locale,
             ),
         )
     await callback.answer()
@@ -1111,35 +1138,37 @@ async def menu_stash(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:templates:open")
 async def menu_templates_open(callback: CallbackQuery) -> None:
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
-            "Шаблоны:\nСначала выбери игру, и я покажу только релевантные наборы.",
-            reply_markup=with_home_button(template_browser_game_keyboard()),
+            f"{tr(locale, 'templates')}:\n{tr(locale, 'friendly_templates_hint')}",
+            reply_markup=with_home_button(template_browser_game_keyboard(locale), locale=locale),
         )
     await callback.answer()
 
 
 @router.callback_query(F.data == "menu:economy:open")
 async def menu_economy_open(callback: CallbackQuery) -> None:
-    text, keyboard = await load_economy_panel(callback.from_user.id, callback.from_user.username)
+    text, keyboard = await load_economy_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(text, reply_markup=keyboard)
-    await callback.answer("Экономика обновлена")
+    await callback.answer()
 
 
 @router.callback_query(F.data == "menu:builds:open")
 async def menu_builds_open(callback: CallbackQuery) -> None:
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
-            build_assistant_intro_text(),
-            reply_markup=with_home_button(build_game_keyboard()),
+            build_assistant_intro_text(locale),
+            reply_markup=with_home_button(build_game_keyboard(locale), locale=locale),
         )
     await callback.answer()
 
 
 @router.callback_query(F.data == "menu:tracking:open")
 async def menu_tracking_open(callback: CallbackQuery) -> None:
-    text, keyboard = await load_tracking_panel(callback.from_user.id, callback.from_user.username)
+    text, keyboard = await load_tracking_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(text, reply_markup=keyboard)
     await callback.answer()
@@ -1147,7 +1176,7 @@ async def menu_tracking_open(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:alerts:open")
 async def menu_alerts_open(callback: CallbackQuery) -> None:
-    text, keyboard = await load_alerts_panel(callback.from_user.id, callback.from_user.username)
+    text, keyboard = await load_alerts_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(text, reply_markup=keyboard)
     await callback.answer()
@@ -1155,17 +1184,17 @@ async def menu_alerts_open(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:account:open")
 async def menu_account_open(callback: CallbackQuery) -> None:
-    text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username)
+    text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
-        await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))
+        await callback.message.edit_text(text, reply_markup=keyboard)
     await callback.answer()
 
 
 @router.callback_query(F.data == "menu:stash:open")
 async def menu_stash_open(callback: CallbackQuery) -> None:
-    text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username)
+    text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
-        await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))
+        await callback.message.edit_text(text, reply_markup=keyboard)
     await callback.answer()
 
 
@@ -1178,19 +1207,20 @@ async def menu_add(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(Command("account"))
 async def account(message: Message) -> None:
-    text, keyboard = await load_account_panel(message.from_user.id, message.from_user.username)
-    await message.answer(text, reply_markup=with_home_button(keyboard))
+    text, keyboard = await load_account_panel(message.from_user.id, message.from_user.username, message.from_user.language_code)
+    await message.answer(text, reply_markup=keyboard)
 
 
 @router.message(Command("stash"))
 async def stash(message: Message) -> None:
-    text, keyboard = await load_stash_panel(message.from_user.id, message.from_user.username)
-    await message.answer(text, reply_markup=with_home_button(keyboard))
+    text, keyboard = await load_stash_panel(message.from_user.id, message.from_user.username, message.from_user.language_code)
+    await message.answer(text, reply_markup=keyboard)
 
 
 @router.message(Command("builds"))
 async def builds(message: Message) -> None:
-    await message.answer(build_assistant_intro_text(), reply_markup=with_home_button(build_game_keyboard()))
+    locale = await load_user_locale(message.from_user.id, message.from_user.username, message.from_user.language_code)
+    await message.answer(build_assistant_intro_text(locale), reply_markup=with_home_button(build_game_keyboard(locale), locale=locale))
 
 
 @router.message(Command("add"))
@@ -1265,9 +1295,10 @@ async def add_tracking(message: Message, state: FSMContext) -> None:
         )
 
     action_text = "Обновлён трекинг" if result.action == "updated" else "Добавлен трекинг"
+    locale = normalize_locale(user.language) if user.language else normalize_locale(message.from_user.language_code)
     await message.answer(
-        build_tracking_result_text(result.item, action_text),
-        reply_markup=with_home_button(tracking_actions_keyboard([result.item])),
+        build_tracking_result_text(result.item, action_text, locale),
+        reply_markup=with_home_button(tracking_actions_keyboard([result.item], locale), locale=locale),
     )
 
 
@@ -1897,10 +1928,10 @@ async def remove_paused_alert_from_panel(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "account:refresh")
 async def refresh_account_panel(callback: CallbackQuery) -> None:
-    text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username)
-    await callback.answer("Статус обновлён")
+    text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
+    await callback.answer()
     if callback.message:
-        await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))
+        await callback.message.edit_text(text, reply_markup=keyboard)
 
 
 @router.callback_query(F.data == "account:disconnect")
@@ -1913,26 +1944,26 @@ async def disconnect_account(callback: CallbackQuery) -> None:
         await callback.answer("PoE аккаунт уже не подключён", show_alert=True)
         return
 
-    text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username)
-    await callback.answer("PoE аккаунт отключён")
+    text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
+    await callback.answer()
     if callback.message:
-        await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))
+        await callback.message.edit_text(text, reply_markup=keyboard)
 
 
 @router.callback_query(F.data == "stash:refresh")
 async def refresh_stash_panel(callback: CallbackQuery) -> None:
-    text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username)
-    await callback.answer("Stash-панель обновлена")
+    text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
+    await callback.answer()
     if callback.message:
-        await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))
+        await callback.message.edit_text(text, reply_markup=keyboard)
 
 
 @router.callback_query(F.data == "stash:back:panel")
 async def stash_back_to_panel(callback: CallbackQuery) -> None:
-    text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username)
+    text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     await callback.answer()
     if callback.message:
-        await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))
+        await callback.message.edit_text(text, reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith("stash:guide:"))
@@ -1942,49 +1973,57 @@ async def stash_open_guide(callback: CallbackQuery) -> None:
     if guide is None:
         await callback.answer("Этот stash-playbook не найден", show_alert=True)
         return
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     await callback.answer()
     if callback.message:
-        await callback.message.edit_text(build_stash_guide_text(guide), reply_markup=stash_guide_keyboard())
+        await callback.message.edit_text(build_stash_guide_text(guide, locale), reply_markup=stash_guide_keyboard(locale))
 
 
 @router.callback_query(F.data == "stash:account")
 async def stash_open_account_panel(callback: CallbackQuery) -> None:
-    text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username)
-    await callback.answer("Открываю панель аккаунта")
+    text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
+    await callback.answer()
     if callback.message:
-        await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))
+        await callback.message.edit_text(text, reply_markup=keyboard)
 
 
 @router.callback_query(F.data == "builds:back:game")
 async def builds_back_to_game(callback: CallbackQuery) -> None:
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
-        await callback.message.edit_text(build_assistant_intro_text(), reply_markup=with_home_button(build_game_keyboard()))
+        await callback.message.edit_text(
+            build_assistant_intro_text(locale),
+            reply_markup=with_home_button(build_game_keyboard(locale), locale=locale),
+        )
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("builds:game:"))
 async def builds_choose_goal(callback: CallbackQuery) -> None:
     game = callback.data.rsplit(":", 1)[1]
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
-        await callback.message.edit_text(build_goal_prompt_text(game), reply_markup=build_goal_keyboard(game))
+        await callback.message.edit_text(build_goal_prompt_text(game, locale), reply_markup=build_goal_keyboard(game, locale))
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("builds:back:goal:"))
 async def builds_back_to_goal(callback: CallbackQuery) -> None:
     game = callback.data.rsplit(":", 1)[1]
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
-        await callback.message.edit_text(build_goal_prompt_text(game), reply_markup=build_goal_keyboard(game))
+        await callback.message.edit_text(build_goal_prompt_text(game, locale), reply_markup=build_goal_keyboard(game, locale))
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("builds:goal:"))
 async def builds_choose_budget(callback: CallbackQuery) -> None:
     _, _, game, goal = callback.data.split(":")
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
-            build_budget_prompt_text(game, goal),
-            reply_markup=build_budget_keyboard(game, goal),
+            build_budget_prompt_text(game, goal, locale),
+            reply_markup=build_budget_keyboard(game, goal, locale),
         )
     await callback.answer()
 
@@ -1992,10 +2031,11 @@ async def builds_choose_budget(callback: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith("builds:back:budget:"))
 async def builds_back_to_budget(callback: CallbackQuery) -> None:
     _, _, _, game, goal = callback.data.split(":")
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
-            build_budget_prompt_text(game, goal),
-            reply_markup=build_budget_keyboard(game, goal),
+            build_budget_prompt_text(game, goal, locale),
+            reply_markup=build_budget_keyboard(game, goal, locale),
         )
     await callback.answer()
 
@@ -2003,10 +2043,11 @@ async def builds_back_to_budget(callback: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith("builds:budget:"))
 async def builds_choose_playstyle(callback: CallbackQuery) -> None:
     _, _, game, goal, budget_tier = callback.data.split(":")
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
-            build_playstyle_prompt_text(game, goal, budget_tier),
-            reply_markup=build_playstyle_keyboard(game, goal, budget_tier),
+            build_playstyle_prompt_text(game, goal, budget_tier, locale),
+            reply_markup=build_playstyle_keyboard(game, goal, budget_tier, locale),
         )
     await callback.answer()
 
@@ -2014,10 +2055,11 @@ async def builds_choose_playstyle(callback: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith("builds:back:playstyle:"))
 async def builds_back_to_playstyle(callback: CallbackQuery) -> None:
     _, _, _, game, goal, budget_tier = callback.data.split(":")
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
-            build_playstyle_prompt_text(game, goal, budget_tier),
-            reply_markup=build_playstyle_keyboard(game, goal, budget_tier),
+            build_playstyle_prompt_text(game, goal, budget_tier, locale),
+            reply_markup=build_playstyle_keyboard(game, goal, budget_tier, locale),
         )
     await callback.answer()
 
@@ -2026,6 +2068,7 @@ async def builds_back_to_playstyle(callback: CallbackQuery) -> None:
 async def builds_back_to_list(callback: CallbackQuery) -> None:
     _, _, _, game, goal, budget_tier, playstyle = callback.data.split(":")
     recommendations = BuildService().recommend(game=game, goal=goal, budget_tier=budget_tier, playstyle=playstyle)
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
             build_recommendations_overview_text(
@@ -2041,6 +2084,7 @@ async def builds_back_to_list(callback: CallbackQuery) -> None:
                 budget_tier,
                 playstyle,
                 recommendations,
+                locale,
             ),
         )
     await callback.answer()
@@ -2050,6 +2094,7 @@ async def builds_back_to_list(callback: CallbackQuery) -> None:
 async def builds_show_recommendations(callback: CallbackQuery) -> None:
     _, _, game, goal, budget_tier, playstyle = callback.data.split(":")
     recommendations = BuildService().recommend(game=game, goal=goal, budget_tier=budget_tier, playstyle=playstyle)
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
         await callback.message.edit_text(
             build_recommendations_overview_text(
@@ -2065,6 +2110,7 @@ async def builds_show_recommendations(callback: CallbackQuery) -> None:
                 budget_tier,
                 playstyle,
                 recommendations,
+                locale,
             ),
         )
     await callback.answer()
@@ -2074,6 +2120,7 @@ async def builds_show_recommendations(callback: CallbackQuery) -> None:
 async def builds_show_detail(callback: CallbackQuery) -> None:
     _, _, game, goal, budget_tier, playstyle, index_str = callback.data.split(":")
     recommendations = BuildService().recommend(game=game, goal=goal, budget_tier=budget_tier, playstyle=playstyle)
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     try:
         recommendation = recommendations[int(index_str)]
     except (IndexError, ValueError):
@@ -2096,6 +2143,7 @@ async def builds_show_detail(callback: CallbackQuery) -> None:
                 playstyle,
                 int(index_str),
                 recommendation,
+                locale,
             ),
         )
     await callback.answer()
@@ -2139,7 +2187,7 @@ async def stats(message: Message) -> None:
 
 @router.message(Command("economy"))
 async def economy(message: Message) -> None:
-    text, keyboard = await load_economy_panel(message.from_user.id, message.from_user.username)
+    text, keyboard = await load_economy_panel(message.from_user.id, message.from_user.username, message.from_user.language_code)
     await message.answer(text, reply_markup=keyboard)
 
 
@@ -2147,18 +2195,20 @@ async def economy(message: Message) -> None:
 async def templates(message: Message) -> None:
     async with session_scope() as session:
         await ensure_user(session, message.from_user.id, message.from_user.username)
+    locale = await load_user_locale(message.from_user.id, message.from_user.username, message.from_user.language_code)
 
     await message.answer(
-        "Шаблоны:\nСначала выбери игру, и я покажу только релевантные наборы.",
-        reply_markup=with_home_button(template_browser_game_keyboard()),
+        f"{tr(locale, 'templates')}:\n{tr(locale, 'friendly_templates_hint')}",
+        reply_markup=with_home_button(template_browser_game_keyboard(locale), locale=locale),
     )
 
 
 @router.callback_query(F.data == "templates:choose_game")
 async def templates_choose_game(callback: CallbackQuery) -> None:
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     await callback.message.edit_text(
-        "Шаблоны:\nСнова выбери игру, и я покажу релевантные цели и наборы.",
-        reply_markup=with_home_button(template_browser_game_keyboard()),
+        f"{tr(locale, 'templates')}:\n{tr(locale, 'friendly_templates_hint')}",
+        reply_markup=with_home_button(template_browser_game_keyboard(locale), locale=locale),
     )
     await callback.answer()
 
@@ -2170,10 +2220,11 @@ async def templates_for_game(callback: CallbackQuery) -> None:
     async with session_scope() as session:
         goals = TemplateService(session).list_goals()
 
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     game_label = "POE 2" if game == "poe2" else "POE 1"
     await callback.message.edit_text(
-        f"Шаблоны для {game_label}:\nСначала выбери цель, и я покажу наборы в более полезном порядке.",
-        reply_markup=template_goal_keyboard(game, goals),
+        tr(locale, "templates_for_game", game=game_label),
+        reply_markup=template_goal_keyboard(game, goals, locale),
     )
     await callback.answer()
 
@@ -2184,10 +2235,11 @@ async def templates_back_to_goals(callback: CallbackQuery) -> None:
     async with session_scope() as session:
         goals = TemplateService(session).list_goals()
 
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     game_label = "POE 2" if game == "poe2" else "POE 1"
     await callback.message.edit_text(
-        f"Шаблоны для {game_label}:\nСначала выбери цель, и я покажу наборы в более полезном порядке.",
-        reply_markup=template_goal_keyboard(game, goals),
+        tr(locale, "templates_for_game", game=game_label),
+        reply_markup=template_goal_keyboard(game, goals, locale),
     )
     await callback.answer()
 
@@ -2200,19 +2252,21 @@ async def templates_for_goal(callback: CallbackQuery) -> None:
         service = TemplateService(session)
         templates = await service.list_public_for_goal(game, goal_key)
         goal = service.get_goal(goal_key)
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
 
     if not templates:
-        await callback.answer("Для этой цели шаблонов пока нет", show_alert=True)
+        await callback.answer(tr(locale, "templates_not_found"), show_alert=True)
         return
 
     goal_title = goal.title if goal else "Под эту цель"
     game_label = "POE 2" if game == "poe2" else "POE 1"
     await callback.message.edit_text(
-        f"{goal_title} · {game_label}\nНиже уже отсортированы самые релевантные наборы для этой задачи.",
+        tr(locale, "templates_for_goal", goal=goal_title, game=game_label),
         reply_markup=templates_keyboard(
             templates,
             game=game,
             back_callback=f"templates:goals:{game}",
+            locale=locale,
         ),
     )
     await callback.answer()
@@ -2225,17 +2279,19 @@ async def templates_show_all_for_game(callback: CallbackQuery) -> None:
     async with session_scope() as session:
         templates = await TemplateService(session).list_public_for_game(game)
 
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if not templates:
-        await callback.answer("Для этой игры шаблонов пока нет", show_alert=True)
+        await callback.answer(tr(locale, "templates_not_found_game"), show_alert=True)
         return
 
     game_label = "POE 2" if game == "poe2" else "POE 1"
     await callback.message.edit_text(
-        f"Все шаблоны для {game_label}\nЕсли нужен не рекомендованный сценарий, можно выбрать набор вручную.",
+        tr(locale, "all_templates_for_game", game=game_label),
         reply_markup=templates_keyboard(
             templates,
             game=game,
             back_callback=f"templates:goals:{game}",
+            locale=locale,
         ),
     )
     await callback.answer()
@@ -2248,14 +2304,15 @@ async def choose_template_from_game_list(callback: CallbackQuery) -> None:
 
     async with session_scope() as session:
         template = await TemplateService(session).get_public_by_id(template_id)
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
 
     if not template:
-        await callback.answer("Шаблон не найден", show_alert=True)
+        await callback.answer(tr(locale, "template_not_found"), show_alert=True)
         return
 
     await callback.message.edit_text(
         build_template_preview_text(template, game),
-        reply_markup=template_preview_keyboard(template.id, game),
+        reply_markup=template_preview_keyboard(template.id, game, locale),
     )
     await callback.answer()
 
@@ -2266,15 +2323,15 @@ async def activate_template(callback: CallbackQuery) -> None:
 
     async with session_scope() as session:
         template = await TemplateService(session).get_public_by_id(template_id)
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
 
     if not template:
-        await callback.answer("Шаблон не найден", show_alert=True)
+        await callback.answer(tr(locale, "template_not_found"), show_alert=True)
         return
 
     await callback.message.edit_text(
-        f"Шаблон: {template.name}\n\n"
-        "Сначала выбери игру, для которой применить этот шаблон.",
-        reply_markup=template_game_keyboard(template.id),
+        tr(locale, "template_game_pick", name=template.name),
+        reply_markup=template_game_keyboard(template.id, locale),
     )
     await callback.answer()
 
@@ -2286,14 +2343,15 @@ async def choose_template_game(callback: CallbackQuery) -> None:
 
     async with session_scope() as session:
         template = await TemplateService(session).get_public_by_id(template_id)
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
 
     if not template:
-        await callback.answer("Шаблон не найден", show_alert=True)
+        await callback.answer(tr(locale, "template_not_found"), show_alert=True)
         return
 
     await callback.message.edit_text(
         build_template_preview_text(template, game),
-        reply_markup=template_preview_keyboard(template.id, game),
+        reply_markup=template_preview_keyboard(template.id, game, locale),
     )
     await callback.answer()
 
@@ -2306,9 +2364,10 @@ async def choose_template_strategy(callback: CallbackQuery) -> None:
     async with session_scope() as session:
         service = TemplateService(session)
         template = await service.get_public_by_id(template_id)
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
 
     if not template:
-        await callback.answer("Шаблон не найден", show_alert=True)
+        await callback.answer(tr(locale, "template_not_found"), show_alert=True)
         return
 
     strategy, resolved_items = service.resolve_items(template, strategy_key=strategy_key)
@@ -2319,9 +2378,10 @@ async def choose_template_strategy(callback: CallbackQuery) -> None:
             game,
             service.list_strategies(template),
             strategy.key,
+            locale,
         ),
     )
-    await callback.answer("Стратегия обновлена")
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("template_strategy_league:"))
@@ -2333,18 +2393,16 @@ async def choose_template_league_for_strategy(callback: CallbackQuery) -> None:
         leagues = await LeagueService(session).list_selection_options(game)
         service = TemplateService(session)
         template = await service.get_public_by_id(template_id)
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
 
     if not template:
-        await callback.answer("Шаблон не найден", show_alert=True)
+        await callback.answer(tr(locale, "template_not_found"), show_alert=True)
         return
 
     strategy = service.get_strategy(template, strategy_key)
     await callback.message.edit_text(
-        f"Шаблон: {template.name}\n"
-        f"Игра: {'POE 2' if game == 'poe2' else 'POE 1'}\n"
-        f"Стратегия: {strategy.title}\n\n"
-        "Теперь выбери лигу, в которую добавить watchers из этого шаблона.",
-        reply_markup=template_league_keyboard(template.id, leagues, game, strategy_key),
+        tr(locale, "template_strategy_pick", name=template.name, game=("POE 2" if game == "poe2" else "POE 1"), strategy=strategy.title),
+        reply_markup=template_league_keyboard(template.id, leagues, game, strategy_key, locale),
     )
     await callback.answer()
 
@@ -2357,16 +2415,15 @@ async def choose_template_league_after_preview(callback: CallbackQuery) -> None:
     async with session_scope() as session:
         leagues = await LeagueService(session).list_selection_options(game)
         template = await TemplateService(session).get_public_by_id(template_id)
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
 
     if not template:
-        await callback.answer("Шаблон не найден", show_alert=True)
+        await callback.answer(tr(locale, "template_not_found"), show_alert=True)
         return
 
     await callback.message.edit_text(
-        f"Шаблон: {template.name}\n"
-        f"Игра: {'POE 2' if game == 'poe2' else 'POE 1'}\n\n"
-        "Теперь выбери лигу, в которую добавить watchers из этого шаблона.",
-        reply_markup=template_league_keyboard(template.id, leagues, game),
+        tr(locale, "template_league_pick", name=template.name, game=("POE 2" if game == "poe2" else "POE 1")),
+        reply_markup=template_league_keyboard(template.id, leagues, game, "balanced", locale),
     )
     await callback.answer()
 
@@ -2378,14 +2435,15 @@ async def template_back_to_game(callback: CallbackQuery) -> None:
 
     async with session_scope() as session:
         template = await TemplateService(session).get_public_by_id(template_id)
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
 
     if not template:
-        await callback.answer("Шаблон не найден", show_alert=True)
+        await callback.answer(tr(locale, "template_not_found"), show_alert=True)
         return
 
     await callback.message.edit_text(
         build_template_preview_text(template, game),
-        reply_markup=template_preview_keyboard(template.id, game),
+        reply_markup=template_preview_keyboard(template.id, game, locale),
     )
     await callback.answer()
 
@@ -2399,8 +2457,9 @@ async def activate_template_for_strategy(callback: CallbackQuery) -> None:
     async with session_scope() as session:
         user = await ensure_user(session, callback.from_user.id, callback.from_user.username)
         league = await LeagueService(session).get_by_id(league_id)
+        locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
         if not league:
-            await callback.answer("Лига не найдена", show_alert=True)
+            await callback.answer(tr(locale, "league_not_found"), show_alert=True)
             return
 
         result = await TemplateService(session).activate(
@@ -2412,18 +2471,19 @@ async def activate_template_for_strategy(callback: CallbackQuery) -> None:
         )
 
     if not result:
-        await callback.answer("Шаблон не найден", show_alert=True)
+        await callback.answer(tr(locale, "template_not_found"), show_alert=True)
         return
 
     await callback.message.edit_text(
         build_template_activation_text(result, league),
         reply_markup=menu_section_keyboard(
-            ("Открыть трекинг", "menu:tracking:open"),
-            ("Домой", "menu:home"),
+            (tr(locale, "open_tracking"), "menu:tracking:open"),
+            (tr(locale, "home"), "menu:home"),
             include_home=False,
+            locale=locale,
         ),
     )
-    await callback.answer("Шаблон подключен")
+    await callback.answer(tr(locale, "template_connected"))
 
 
 @router.callback_query(F.data.startswith("template_league:"))
@@ -2435,8 +2495,9 @@ async def activate_template_for_league(callback: CallbackQuery) -> None:
     async with session_scope() as session:
         user = await ensure_user(session, callback.from_user.id, callback.from_user.username)
         league = await LeagueService(session).get_by_id(league_id)
+        locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
         if not league:
-            await callback.answer("Лига не найдена", show_alert=True)
+            await callback.answer(tr(locale, "league_not_found"), show_alert=True)
             return
 
         result = await TemplateService(session).activate(
@@ -2447,35 +2508,71 @@ async def activate_template_for_league(callback: CallbackQuery) -> None:
         )
 
     if not result:
-        await callback.answer("Шаблон не найден", show_alert=True)
+        await callback.answer(tr(locale, "template_not_found"), show_alert=True)
         return
 
     await callback.message.edit_text(
         build_template_activation_text(result, league),
         reply_markup=menu_section_keyboard(
-            ("Открыть трекинг", "menu:tracking:open"),
-            ("Домой", "menu:home"),
+            (tr(locale, "open_tracking"), "menu:tracking:open"),
+            (tr(locale, "home"), "menu:home"),
             include_home=False,
+            locale=locale,
         ),
     )
-    await callback.answer("Шаблон подключен")
+    await callback.answer(tr(locale, "template_connected"))
 
 
 @router.callback_query(F.data == "template:cancel")
 async def cancel_template_activation(callback: CallbackQuery) -> None:
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     await callback.message.edit_text(
-        "Ок, отменил подключение шаблона.",
-        reply_markup=menu_section_keyboard(("Домой", "menu:home"), include_home=False),
+        tr(locale, "template_cancelled_text"),
+        reply_markup=menu_section_keyboard((tr(locale, "home"), "menu:home"), include_home=False, locale=locale),
     )
-    await callback.answer("Отменено")
+    await callback.answer(tr(locale, "template_cancelled_short"))
 
 
 @router.message(Command("settings"))
 async def settings(message: Message) -> None:
-    text, _ = await load_account_panel(message.from_user.id, message.from_user.username)
+    locale = await load_user_locale(message.from_user.id, message.from_user.username, message.from_user.language_code)
+    text, _ = await load_account_panel(message.from_user.id, message.from_user.username, message.from_user.language_code)
     await message.answer(
-        "Настройки MVP:\n"
-        "Лига по умолчанию берётся из DEFAULT_LEAGUE_NAME.\n\n"
+        f"{tr(locale, 'settings')}\n"
+        f"{tr(locale, 'settings_intro')}\n\n"
+        f"{tr(locale, 'current_language', language=LANGUAGE_NAMES[locale])}\n"
+        f"{tr(locale, 'settings_default_league')}\n\n"
         f"{text}\n\n"
-        "Для управления привязкой открой /account.",
+        f"{tr(locale, 'settings_account_hint')}",
+        reply_markup=menu_section_keyboard(
+            (tr(locale, "choose_language"), "settings:language_menu"),
+            (tr(locale, "settings_open_account"), "menu:account:open"),
+            (tr(locale, "settings_open_stash"), "menu:stash:open"),
+            locale=locale,
+        ),
     )
+
+
+@router.callback_query(F.data == "settings:language_menu")
+async def settings_language_menu(callback: CallbackQuery) -> None:
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
+    if callback.message:
+        await callback.message.edit_text(
+            f"{tr(locale, 'language_settings_title')}\n\n{tr(locale, 'language_settings_hint')}",
+            reply_markup=language_keyboard(locale, back_callback="menu:home"),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("settings:language:"))
+async def settings_change_language(callback: CallbackQuery) -> None:
+    locale = normalize_locale(callback.data.rsplit(":", 1)[1])
+    async with session_scope() as session:
+        await ensure_user(session, callback.from_user.id, callback.from_user.username)
+        await UserService(session).set_language(callback.from_user.id, locale)
+    if callback.message:
+        await callback.message.edit_text(
+            f"{tr(locale, 'language_changed_text', language=LANGUAGE_NAMES[locale])}\n\n{tr(locale, 'settings_saved_hint')}",
+            reply_markup=home_menu_keyboard(locale),
+        )
+    await callback.answer(tr(locale, "language_saved"))
