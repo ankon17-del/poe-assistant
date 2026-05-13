@@ -884,8 +884,8 @@ async def begin_add_wizard(message: Message, state: FSMContext) -> None:
         bot=message.bot,
         chat_id=message.chat.id,
         text=(
-            "Добавим новый трекинг.\n\n"
-            "Сначала выбери, что именно хочешь отслеживать."
+            "Новый трекинг\n\n"
+            "Шаг 1/4: выбери тип источника."
         ),
         reply_markup=add_entry_keyboard(),
     )
@@ -899,7 +899,7 @@ async def render_duplicate_resolution(
     items: list,
 ) -> None:
     lines = [
-        "Я нашел похожие watcher'ы для этого предмета.",
+        "Нашёл похожие watcher'ы.",
         "Можно обновить один из них или создать новый отдельно.",
         "",
     ]
@@ -1200,8 +1200,9 @@ async def add_tracking(message: Message, state: FSMContext) -> None:
             bot=message.bot,
             chat_id=message.chat.id,
             text=(
-                "Ссылка получена.\n\n"
-                "Теперь пришли короткое название трекера (например: Mageblood, TS Bow, Mirror Ring)."
+                "Trade URL получен.\n\n"
+                "Шаг 2/3: пришли короткое название трекера.\n"
+                "Например: Mageblood, TS Bow, Mirror Ring."
             ),
         )
         return
@@ -1213,7 +1214,7 @@ async def add_tracking(message: Message, state: FSMContext) -> None:
             target_price, target_currency = parse_threshold_input(price_part)
         except InvalidOperation:
             await message.answer(
-                "Не понял порог цены. Пример:\n"
+                "Не понял порог.\n\nПримеры:\n"
                 "/add Divine Orb | 1\n"
                 "/add Divine Orb | 150 chaos\n"
                 "/add Divine Orb | 0.5 div"
@@ -1221,12 +1222,12 @@ async def add_tracking(message: Message, state: FSMContext) -> None:
             return
     elif not trade_url:
         await message.answer(
-            "Для команды в одну строку нужен порог цены.\n\n"
+            "Для команды в одну строку нужен порог.\n\n"
             "Примеры:\n"
             "/add Divine Orb | 1\n"
             "/add Divine Orb | 150 chaos\n"
             "/add Divine Orb | 0.5 div\n\n"
-            "Либо используй просто /add — там мастер с выбором и поиском."
+            "Если удобнее, используй просто /add."
         )
         return
 
@@ -1255,7 +1256,7 @@ async def add_mode_item(callback: CallbackQuery, state: FSMContext) -> None:
         state=state,
         bot=callback.bot,
         chat_id=callback.message.chat.id,
-        text="Выбери игру, для которой будем создавать watcher.",
+        text="Новый трекинг\n\nШаг 2/4: выбери игру.",
         reply_markup=game_keyboard(),
     )
     await callback.answer()
@@ -1269,7 +1270,7 @@ async def add_mode_trade_url(callback: CallbackQuery, state: FSMContext) -> None
         state=state,
         bot=callback.bot,
         chat_id=callback.message.chat.id,
-        text="Пришли trade URL отдельным сообщением. Я сохраню его как отдельный watcher.",
+        text="Новый трекинг\n\nШаг 2/4: пришли trade URL отдельным сообщением.",
     )
     await callback.answer()
 
@@ -1287,8 +1288,9 @@ async def add_choose_game(callback: CallbackQuery, state: FSMContext) -> None:
         bot=callback.bot,
         chat_id=callback.message.chat.id,
         text=(
-            "Теперь выбери лигу.\n"
-            "Актуальные лиги показываю выше стандартных, чтобы свежие варианты было проще выбрать."
+            "Новый трекинг\n\n"
+            "Шаг 3/4: выбери лигу.\n"
+            "Актуальные лиги показываю выше стандартных."
         ),
         reply_markup=league_keyboard(leagues),
     )
@@ -1313,8 +1315,8 @@ async def add_choose_league(callback: CallbackQuery, state: FSMContext) -> None:
         chat_id=callback.message.chat.id,
         text=(
             f"Лига: {league.name}\n\n"
-            "Можно сразу выбрать частую валюту кнопкой ниже или прислать часть названия предмета/валюты. "
-            "Я покажу варианты и буду обновлять это сообщение, чтобы не засорять чат."
+            "Шаг 4/4: выбери частую валюту кнопкой ниже\n"
+            "или пришли часть названия предмета / валюты."
         ),
         reply_markup=currency_presets_keyboard(),
     )
@@ -1337,7 +1339,7 @@ async def add_search_query(message: Message, state: FSMContext) -> None:
         state=state,
         bot=message.bot,
         chat_id=message.chat.id,
-        text=f"Нашел варианты для: {query}\nВыбери готовый вариант или используй свой текст как есть.",
+        text=f"Варианты для: {query}\n\nВыбери готовый вариант или используй свой текст как есть.",
         reply_markup=search_results_keyboard(results, query),
     )
 
@@ -1363,7 +1365,7 @@ async def add_choose_currency_preset(callback: CallbackQuery, state: FSMContext)
         chat_id=callback.message.chat.id,
         text=(
             f"Выбран пресет: {item_name}\n\n"
-            "В какой валюте будем задавать порог?"
+            "Теперь выбери валюту порога."
         ),
         reply_markup=threshold_currency_keyboard(),
     )
@@ -1392,7 +1394,7 @@ async def add_choose_item(callback: CallbackQuery, state: FSMContext) -> None:
         chat_id=callback.message.chat.id,
         text=(
             f"Предмет: {item_name}\n\n"
-            "В какой валюте будем задавать порог?"
+            "Теперь выбери валюту порога."
         ),
         reply_markup=threshold_currency_keyboard(),
     )
@@ -1409,8 +1411,9 @@ async def add_choose_threshold_currency(callback: CallbackQuery, state: FSMConte
         bot=callback.bot,
         chat_id=callback.message.chat.id,
         text=(
-            f"Ок, порог будем хранить в {target_currency}.\n\n"
-            "Теперь пришли только число. Например: 1, 150 или 0.5"
+            f"Валюта порога: {target_currency}\n\n"
+            "Теперь пришли только число.\n"
+            "Например: 1, 150 или 0.5"
         ),
     )
     await callback.answer()
@@ -1422,7 +1425,7 @@ async def add_enter_threshold(message: Message, state: FSMContext) -> None:
     try:
         amount = Decimal(value.replace(",", "."))
     except InvalidOperation:
-        await message.answer("Не получилось разобрать число. Пример: 1, 150 или 0.5")
+        await message.answer("Не получилось разобрать число.\nПримеры: 1, 150, 0.5")
         return
 
     await delete_if_possible(message)
@@ -1493,8 +1496,9 @@ async def add_enter_trade_url(message: Message, state: FSMContext) -> None:
         bot=message.bot,
         chat_id=message.chat.id,
         text=(
-            "Ссылка принята.\n\n"
-            "Теперь пришли название трекера (например: Mageblood)."
+            "Trade URL принят.\n\n"
+            "Шаг 3/4: пришли название трекера.\n"
+            "Например: Mageblood."
         ),
     )
 
@@ -1503,7 +1507,7 @@ async def add_enter_trade_url(message: Message, state: FSMContext) -> None:
 async def add_enter_trade_name(message: Message, state: FSMContext) -> None:
     item_name = (message.text or "").strip()
     if not item_name:
-        await message.answer("Нужен текст названия. Например: Mageblood")
+        await message.answer("Нужно название трекера.\nНапример: Mageblood")
         return
 
     await delete_if_possible(message)
@@ -1515,7 +1519,7 @@ async def add_enter_trade_name(message: Message, state: FSMContext) -> None:
         chat_id=message.chat.id,
         text=(
             f"Название: {item_name}\n\n"
-            "В какой валюте задаем порог уведомления?"
+            "Теперь выбери валюту порога."
         ),
         reply_markup=threshold_currency_keyboard(),
     )
@@ -1567,7 +1571,7 @@ async def add_back_to_game(callback: CallbackQuery, state: FSMContext) -> None:
         state=state,
         bot=callback.bot,
         chat_id=callback.message.chat.id,
-        text="Выбери игру, для которой будем создавать watcher.",
+        text="Новый трекинг\n\nШаг 2/4: выбери игру.",
         reply_markup=game_keyboard(),
     )
     await callback.answer()
