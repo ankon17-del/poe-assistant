@@ -334,11 +334,11 @@ def build_home_text() -> str:
         "POE Assistant\n\n"
         "Открой нужный раздел через меню ниже.\n\n"
         "Что уже можно делать:\n"
-        "- templates для быстрых сетапов\n"
-        "- economy и currency alerts\n"
-        "- builds с planner / guide / tree\n"
-        "- tracking и alerts под рукой\n"
-        "- account / stash панели готовы к расширению после ответа GGG"
+        "- шаблоны для быстрых сетапов\n"
+        "- экономика и currency alerts\n"
+        "- билды с planner / guide / tree\n"
+        "- трекинг и alerts под рукой\n"
+        "- аккаунт и тайник готовы к расширению после ответа GGG"
     )
 
 
@@ -356,6 +356,54 @@ def build_menu_help_text() -> str:
         "/stash — stash-панель\n"
         "/stats — статистика\n"
         "/settings — текущие MVP-настройки"
+    )
+
+
+def build_templates_section_text() -> str:
+    return (
+        "Шаблоны\n\n"
+        "Готовые наборы watcher'ов под игру, цель и стратегию.\n"
+        "Подходят для быстрого старта без ручной сборки сетапа."
+    )
+
+
+def build_economy_section_text() -> str:
+    return (
+        "Экономика\n\n"
+        "Здесь у нас рынок, currency alerts и быстрый обзор движения валют.\n"
+        "Можно открыть полный dashboard или сразу перейти к сработавшим alerts."
+    )
+
+
+def build_builds_section_text() -> str:
+    return (
+        "Билды\n\n"
+        "Подбор билдов по игре, цели, бюджету и стилю.\n"
+        "Внутри есть planner, guide, tree, atlas и endgame-подсказки."
+    )
+
+
+def build_tracking_section_text() -> str:
+    return (
+        "Трекинг\n\n"
+        "Управление активными watcher'ами и быстрый вход в мастер добавления.\n"
+        "Если что-то уже сработало, отсюда же удобно перейти в alerts."
+    )
+
+
+def build_account_section_text() -> str:
+    return (
+        "Аккаунт\n\n"
+        "Панель привязки PoE-аккаунта и состояние интеграции.\n"
+        "Сейчас это foundation-слой, который ждёт ответ GGG для полного раскрытия."
+    )
+
+
+def build_stash_section_text() -> str:
+    return (
+        "Тайник\n\n"
+        "Stash-панель и readiness под будущий реальный stash-analysis.\n"
+        "До ответа GGG здесь держим основу и навигацию к связанным функциям."
     )
 
 
@@ -938,22 +986,115 @@ async def menu_help(callback: CallbackQuery) -> None:
 async def menu_templates(callback: CallbackQuery) -> None:
     if callback.message:
         await callback.message.edit_text(
-            "Шаблоны\n\nГотовые наборы под игру, цель и стратегию применения.",
-            reply_markup=menu_section_keyboard(("Открыть шаблоны", "templates:choose_game")),
+            build_templates_section_text(),
+            reply_markup=menu_section_keyboard(
+                ("Открыть шаблоны", "menu:templates:open"),
+                ("Добавить трекинг вручную", "menu:add"),
+            ),
         )
     await callback.answer()
 
 
 @router.callback_query(F.data == "menu:economy")
 async def menu_economy(callback: CallbackQuery) -> None:
+    if callback.message:
+        await callback.message.edit_text(
+            build_economy_section_text(),
+            reply_markup=menu_section_keyboard(
+                ("Открыть обзор экономики", "menu:economy:open"),
+                ("Сработавшие alerts", "menu:alerts:open"),
+                ("Шаблоны рынка", "menu:templates:open"),
+            ),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu:builds")
+async def menu_builds(callback: CallbackQuery) -> None:
+    if callback.message:
+        await callback.message.edit_text(
+            build_builds_section_text(),
+            reply_markup=menu_section_keyboard(
+                ("Подобрать билд", "menu:builds:open"),
+                ("Открыть шаблоны", "menu:templates:open"),
+            ),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu:tracking")
+async def menu_tracking(callback: CallbackQuery) -> None:
+    if callback.message:
+        await callback.message.edit_text(
+            build_tracking_section_text(),
+            reply_markup=menu_section_keyboard(
+                ("Активный трекинг", "menu:tracking:open"),
+                ("Добавить watcher", "menu:add"),
+                ("Сработавшие alerts", "menu:alerts:open"),
+            ),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu:alerts")
+async def menu_alerts(callback: CallbackQuery) -> None:
+    if callback.message:
+        await callback.message.edit_text(
+            "Алерты\n\nСработавшие currency alerts, которые стоят на паузе и ждут перезапуска.",
+            reply_markup=menu_section_keyboard(
+                ("Открыть alerts", "menu:alerts:open"),
+                ("Открыть экономику", "menu:economy:open"),
+            ),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu:account")
+async def menu_account(callback: CallbackQuery) -> None:
+    if callback.message:
+        await callback.message.edit_text(
+            build_account_section_text(),
+            reply_markup=menu_section_keyboard(
+                ("Открыть панель аккаунта", "menu:account:open"),
+                ("Открыть тайник", "menu:stash:open"),
+            ),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu:stash")
+async def menu_stash(callback: CallbackQuery) -> None:
+    if callback.message:
+        await callback.message.edit_text(
+            build_stash_section_text(),
+            reply_markup=menu_section_keyboard(
+                ("Открыть stash-панель", "menu:stash:open"),
+                ("Открыть аккаунт", "menu:account:open"),
+            ),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu:templates:open")
+async def menu_templates_open(callback: CallbackQuery) -> None:
+    if callback.message:
+        await callback.message.edit_text(
+            "Шаблоны:\nСначала выбери игру, и я покажу только релевантные наборы.",
+            reply_markup=with_home_button(template_browser_game_keyboard()),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu:economy:open")
+async def menu_economy_open(callback: CallbackQuery) -> None:
     text, keyboard = await load_economy_panel(callback.from_user.id, callback.from_user.username)
     if callback.message:
         await callback.message.edit_text(text, reply_markup=keyboard)
     await callback.answer("Экономика обновлена")
 
 
-@router.callback_query(F.data == "menu:builds")
-async def menu_builds(callback: CallbackQuery) -> None:
+@router.callback_query(F.data == "menu:builds:open")
+async def menu_builds_open(callback: CallbackQuery) -> None:
     if callback.message:
         await callback.message.edit_text(
             build_assistant_intro_text(),
@@ -962,32 +1103,32 @@ async def menu_builds(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
-@router.callback_query(F.data == "menu:tracking")
-async def menu_tracking(callback: CallbackQuery) -> None:
+@router.callback_query(F.data == "menu:tracking:open")
+async def menu_tracking_open(callback: CallbackQuery) -> None:
     text, keyboard = await load_tracking_panel(callback.from_user.id, callback.from_user.username)
     if callback.message:
         await callback.message.edit_text(text, reply_markup=keyboard)
     await callback.answer()
 
 
-@router.callback_query(F.data == "menu:alerts")
-async def menu_alerts(callback: CallbackQuery) -> None:
+@router.callback_query(F.data == "menu:alerts:open")
+async def menu_alerts_open(callback: CallbackQuery) -> None:
     text, keyboard = await load_alerts_panel(callback.from_user.id, callback.from_user.username)
     if callback.message:
         await callback.message.edit_text(text, reply_markup=keyboard)
     await callback.answer()
 
 
-@router.callback_query(F.data == "menu:account")
-async def menu_account(callback: CallbackQuery) -> None:
+@router.callback_query(F.data == "menu:account:open")
+async def menu_account_open(callback: CallbackQuery) -> None:
     text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username)
     if callback.message:
         await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))
     await callback.answer()
 
 
-@router.callback_query(F.data == "menu:stash")
-async def menu_stash(callback: CallbackQuery) -> None:
+@router.callback_query(F.data == "menu:stash:open")
+async def menu_stash_open(callback: CallbackQuery) -> None:
     text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username)
     if callback.message:
         await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))

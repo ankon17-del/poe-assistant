@@ -24,7 +24,7 @@ def home_menu_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="Аккаунт", callback_data="menu:account"),
             ],
             [
-                InlineKeyboardButton(text="Stash", callback_data="menu:stash"),
+                InlineKeyboardButton(text="Тайник", callback_data="menu:stash"),
                 InlineKeyboardButton(text="Помощь", callback_data="menu:help"),
             ],
         ]
