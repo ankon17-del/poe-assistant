@@ -301,11 +301,10 @@ def build_template_preview_text(template, game: str, strategy=None, resolved_ite
 def build_template_activation_text(result, league) -> str:
     game_label = "POE 2" if league.realm == "poe2" else "POE 1"
     lines = [
-        f"Шаблон {result.template_name} подключен.",
-        f"Игра: {game_label}",
-        f"Лига: {league.name}",
+        f"Шаблон подключён · {result.template_name}",
+        f"{game_label} / {league.name}",
         f"Стратегия: {result.strategy_name}",
-        f"Создано watcher'ов: {result.created_count}",
+        f"Создано: {result.created_count}",
         f"Обновлено или реактивировано: {result.updated_count}",
     ]
 
@@ -316,7 +315,7 @@ def build_template_activation_text(result, league) -> str:
 
     if result.updated_items:
         lines.append("")
-        lines.append("Обновлены или реактивированы:")
+        lines.append("Обновлены / реактивированы:")
         lines.extend(f"- {item_name}" for item_name in result.updated_items)
 
     return "\n".join(lines)
@@ -406,6 +405,18 @@ def build_stash_section_text() -> str:
         "Stash-панель и readiness под будущий реальный stash-analysis.\n"
         "До ответа GGG здесь держим основу и навигацию к связанным функциям."
     )
+
+
+def build_tracking_result_text(item, action: str) -> str:
+    lines = [f"{action} · #{item.id} {item.item_name}"]
+    if item.league:
+        game_label = "POE 2" if item.league.realm == "poe2" else "POE 1"
+        lines.append(f"{game_label} / {item.league.name}")
+    if item.target_price is not None:
+        lines.append(f"Порог: {format_decimal(Decimal(item.target_price))} {item.target_currency}")
+    if item.trade_url:
+        lines.append("Источник: trade URL")
+    return "\n".join(lines)
 
 
 def build_goal_prompt_text(game: str) -> str:
@@ -947,19 +958,14 @@ async def finalize_tracking_creation(
         )
 
     item = result.item
-    action_text = "Обновил" if result.action == "updated" else "Добавил"
-    response_lines = [f"{action_text} трекинг #{item.id}: {item.item_name}"]
-    if item.target_price is not None:
-        response_lines.append(f"Порог: {format_decimal(Decimal(item.target_price))} {item.target_currency}")
-    if item.trade_url:
-        response_lines.append("Источник: trade URL")
+    action_text = "Обновлён трекинг" if result.action == "updated" else "Добавлен трекинг"
 
     await finish_wizard(
         state=state,
         bot=bot,
         chat_id=chat_id,
-        text="\n".join(response_lines),
-        reply_markup=tracking_actions_keyboard([item]),
+        text=build_tracking_result_text(item, action_text),
+        reply_markup=with_home_button(tracking_actions_keyboard([item])),
     )
 
 
@@ -1241,12 +1247,11 @@ async def add_tracking(message: Message, state: FSMContext) -> None:
             target_currency=target_currency,
         )
 
-    response_lines = [f"{'Обновил' if result.action == 'updated' else 'Добавил'} трекинг #{result.item.id}: {result.item.item_name}"]
-    if target_price is not None:
-        response_lines.append(f"Порог: {format_decimal(target_price)} {target_currency}")
-    if trade_url:
-        response_lines.append("Источник: trade URL")
-    await message.answer("\n".join(response_lines), reply_markup=tracking_actions_keyboard([result.item]))
+    action_text = "Обновлён трекинг" if result.action == "updated" else "Добавлен трекинг"
+    await message.answer(
+        build_tracking_result_text(result.item, action_text),
+        reply_markup=with_home_button(tracking_actions_keyboard([result.item])),
+    )
 
 
 @router.callback_query(F.data == "add:mode:item")
@@ -1643,12 +1648,15 @@ async def remove_tracking_from_list(callback: CallbackQuery) -> None:
         return
 
     if not items:
-        await callback.message.edit_text("Активного трекинга пока нет. Добавь предмет через /add.")
+        await callback.message.edit_text(
+            "Активного трекинга пока нет.",
+            reply_markup=menu_section_keyboard(("Добавить трекинг", "menu:add")),
+        )
         return
 
     await callback.message.edit_text(
         build_tracking_list_text(items),
-        reply_markup=tracking_actions_keyboard(items),
+        reply_markup=with_home_button(tracking_actions_keyboard(items)),
     )
 
 
@@ -1670,12 +1678,15 @@ async def remove_tracking_from_list_v2(callback: CallbackQuery) -> None:
         return
 
     if not items:
-        await callback.message.edit_text("Активного трекинга пока нет. Добавь предмет через /add.")
+        await callback.message.edit_text(
+            "Активного трекинга пока нет.",
+            reply_markup=menu_section_keyboard(("Добавить трекинг", "menu:add")),
+        )
         return
 
     await callback.message.edit_text(
         build_tracking_list_text(items),
-        reply_markup=tracking_actions_keyboard(items),
+        reply_markup=with_home_button(tracking_actions_keyboard(items)),
     )
 
 
@@ -1698,7 +1709,7 @@ async def reactivate_tracking_from_list_v2(callback: CallbackQuery) -> None:
 
     await callback.message.edit_text(
         build_tracking_list_text(items),
-        reply_markup=tracking_actions_keyboard(items),
+        reply_markup=with_home_button(tracking_actions_keyboard(items)),
     )
 
 
@@ -1764,10 +1775,16 @@ async def reactivate_all_paused_alerts(callback: CallbackQuery) -> None:
         return
 
     if not items:
-        await callback.message.edit_text("Сработавших price alerts пока нет. Всё снова активно.")
+        await callback.message.edit_text(
+            "Сработавших alerts на паузе больше нет. Всё снова активно.",
+            reply_markup=menu_section_keyboard(("Открыть экономику", "menu:economy:open")),
+        )
         return
 
-    await callback.message.edit_text(build_paused_alerts_text(items), reply_markup=paused_alerts_keyboard(items))
+    await callback.message.edit_text(
+        build_paused_alerts_text(items),
+        reply_markup=with_home_button(paused_alerts_keyboard(items)),
+    )
 
 
 @router.callback_query(F.data.startswith("alerts:reactivate_game:"))
@@ -1789,10 +1806,16 @@ async def reactivate_paused_alerts_for_game(callback: CallbackQuery) -> None:
         return
 
     if not items:
-        await callback.message.edit_text("Сработавших price alerts пока нет. Всё снова активно.")
+        await callback.message.edit_text(
+            "Сработавших alerts на паузе больше нет. Всё снова активно.",
+            reply_markup=menu_section_keyboard(("Открыть экономику", "menu:economy:open")),
+        )
         return
 
-    await callback.message.edit_text(build_paused_alerts_text(items), reply_markup=paused_alerts_keyboard(items))
+    await callback.message.edit_text(
+        build_paused_alerts_text(items),
+        reply_markup=with_home_button(paused_alerts_keyboard(items)),
+    )
 
 
 @router.callback_query(F.data.startswith("alerts:reactivate:"))
@@ -1813,10 +1836,16 @@ async def reactivate_paused_alert_from_panel(callback: CallbackQuery) -> None:
         return
 
     if not items:
-        await callback.message.edit_text("Сработавших price alerts пока нет. Всё снова активно.")
+        await callback.message.edit_text(
+            "Сработавших alerts на паузе больше нет. Всё снова активно.",
+            reply_markup=menu_section_keyboard(("Открыть экономику", "menu:economy:open")),
+        )
         return
 
-    await callback.message.edit_text(build_paused_alerts_text(items), reply_markup=paused_alerts_keyboard(items))
+    await callback.message.edit_text(
+        build_paused_alerts_text(items),
+        reply_markup=with_home_button(paused_alerts_keyboard(items)),
+    )
 
 
 @router.callback_query(F.data.startswith("alerts:remove:"))
@@ -1837,10 +1866,16 @@ async def remove_paused_alert_from_panel(callback: CallbackQuery) -> None:
         return
 
     if not items:
-        await callback.message.edit_text("Сработавших price alerts пока нет.")
+        await callback.message.edit_text(
+            "Сработавших alerts на паузе больше нет.",
+            reply_markup=menu_section_keyboard(("Открыть экономику", "menu:economy:open")),
+        )
         return
 
-    await callback.message.edit_text(build_paused_alerts_text(items), reply_markup=paused_alerts_keyboard(items))
+    await callback.message.edit_text(
+        build_paused_alerts_text(items),
+        reply_markup=with_home_button(paused_alerts_keyboard(items)),
+    )
 
 
 @router.callback_query(F.data == "account:refresh")
@@ -2363,7 +2398,14 @@ async def activate_template_for_strategy(callback: CallbackQuery) -> None:
         await callback.answer("Шаблон не найден", show_alert=True)
         return
 
-    await callback.message.edit_text(build_template_activation_text(result, league))
+    await callback.message.edit_text(
+        build_template_activation_text(result, league),
+        reply_markup=menu_section_keyboard(
+            ("Открыть трекинг", "menu:tracking:open"),
+            ("Домой", "menu:home"),
+            include_home=False,
+        ),
+    )
     await callback.answer("Шаблон подключен")
 
 
@@ -2391,7 +2433,14 @@ async def activate_template_for_league(callback: CallbackQuery) -> None:
         await callback.answer("Шаблон не найден", show_alert=True)
         return
 
-    await callback.message.edit_text(build_template_activation_text(result, league))
+    await callback.message.edit_text(
+        build_template_activation_text(result, league),
+        reply_markup=menu_section_keyboard(
+            ("Открыть трекинг", "menu:tracking:open"),
+            ("Домой", "menu:home"),
+            include_home=False,
+        ),
+    )
     await callback.answer("Шаблон подключен")
 
 
