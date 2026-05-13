@@ -8,6 +8,42 @@ from app.models.tracked_item import TrackedItem
 from app.services.builds import BuildRecommendation
 
 
+def home_menu_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Шаблоны", callback_data="menu:templates"),
+                InlineKeyboardButton(text="Экономика", callback_data="menu:economy"),
+            ],
+            [
+                InlineKeyboardButton(text="Билды", callback_data="menu:builds"),
+                InlineKeyboardButton(text="Трекинг", callback_data="menu:tracking"),
+            ],
+            [
+                InlineKeyboardButton(text="Алерты", callback_data="menu:alerts"),
+                InlineKeyboardButton(text="Аккаунт", callback_data="menu:account"),
+            ],
+            [
+                InlineKeyboardButton(text="Stash", callback_data="menu:stash"),
+                InlineKeyboardButton(text="Помощь", callback_data="menu:help"),
+            ],
+        ]
+    )
+
+
+def menu_section_keyboard(*buttons: tuple[str, str], include_home: bool = True) -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton(text=text, callback_data=callback_data)] for text, callback_data in buttons]
+    if include_home:
+        rows.append([InlineKeyboardButton(text="Домой", callback_data="menu:home")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def with_home_button(markup: InlineKeyboardMarkup, *, label: str = "Домой") -> InlineKeyboardMarkup:
+    rows = [list(row) for row in markup.inline_keyboard]
+    rows.append([InlineKeyboardButton(text=label, callback_data="menu:home")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def templates_keyboard(
     templates: list[TemplateGroup],
     game: str | None = None,

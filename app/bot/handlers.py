@@ -23,6 +23,8 @@ from app.bot.keyboards import (
     duplicate_resolution_keyboard,
     game_keyboard,
     league_keyboard,
+    home_menu_keyboard,
+    menu_section_keyboard,
     paused_alerts_keyboard,
     search_results_keyboard,
     stash_keyboard,
@@ -36,6 +38,7 @@ from app.bot.keyboards import (
     templates_keyboard,
     threshold_currency_keyboard,
     tracking_actions_keyboard,
+    with_home_button,
 )
 from app.services.builds import BuildRecommendation, BuildService
 from app.models.enums import IntegrationType
@@ -323,6 +326,36 @@ def build_assistant_intro_text() -> str:
         "Build assistant:\n\n"
         "Помогу подобрать стартовое направление под игру, бюджет и стиль.\n"
         "Сначала выбери POE 1 или POE 2."
+    )
+
+
+def build_home_text() -> str:
+    return (
+        "POE Assistant\n\n"
+        "Открой нужный раздел через меню ниже.\n\n"
+        "Что уже можно делать:\n"
+        "- templates для быстрых сетапов\n"
+        "- economy и currency alerts\n"
+        "- builds с planner / guide / tree\n"
+        "- tracking и alerts под рукой\n"
+        "- account / stash панели готовы к расширению после ответа GGG"
+    )
+
+
+def build_menu_help_text() -> str:
+    return (
+        "Навигация:\n\n"
+        "/menu или /start — главный экран\n"
+        "/add — добавить watcher вручную\n"
+        "/templates — готовые сетапы\n"
+        "/economy — рынок и currency alerts\n"
+        "/builds — подбор билдов\n"
+        "/list — активный трекинг\n"
+        "/alerts — сработавшие alerts\n"
+        "/account — привязка PoE-аккаунта\n"
+        "/stash — stash-панель\n"
+        "/stats — статистика\n"
+        "/settings — текущие MVP-настройки"
     )
 
 
@@ -737,6 +770,53 @@ async def load_stash_panel(telegram_id: int, username: str | None) -> tuple[str,
     return build_stash_text(summary), stash_keyboard(connect_url=connect_url, account_connected=summary.account_connected)
 
 
+async def load_tracking_panel(telegram_id: int, username: str | None) -> tuple[str, object]:
+    async with session_scope() as session:
+        user = await ensure_user(session, telegram_id, username)
+        items = await TrackingService(session).list_items(user)
+
+    if not items:
+        return "Активного трекинга пока нет. Добавь предмет через /add.", menu_section_keyboard(("Добавить трекинг", "menu:add"))
+    return build_tracking_list_text(items), with_home_button(tracking_actions_keyboard(items))
+
+
+async def load_alerts_panel(telegram_id: int, username: str | None) -> tuple[str, object]:
+    async with session_scope() as session:
+        user = await ensure_user(session, telegram_id, username)
+        items = await TrackingService(session).list_paused_price_alerts(user)
+
+    if not items:
+        return (
+            "Сработавших price alerts пока нет.\n\n"
+            "Когда alert сработает, он появится здесь, и его можно будет быстро перезапустить.",
+            menu_section_keyboard(("Открыть экономику", "menu:economy")),
+        )
+    return build_paused_alerts_text(items), with_home_button(paused_alerts_keyboard(items))
+
+
+async def load_economy_panel(telegram_id: int, username: str | None) -> tuple[str, object]:
+    async with session_scope() as session:
+        user = await ensure_user(session, telegram_id, username)
+        summaries, overview = await EconomyService(session).get_user_economy_dashboard(user)
+
+    return build_economy_text(summaries, overview), menu_section_keyboard(
+        ("Обновить экономику", "menu:economy"),
+        ("Открыть alerts", "menu:alerts"),
+    )
+
+
+async def answer_home_screen(message: Message) -> None:
+    async with session_scope() as session:
+        await ensure_user(session, message.from_user.id, message.from_user.username)
+    await message.answer(build_home_text(), reply_markup=home_menu_keyboard())
+
+
+async def edit_home_screen(callback: CallbackQuery) -> None:
+    if callback.message:
+        await callback.message.edit_text(build_home_text(), reply_markup=home_menu_keyboard())
+    await callback.answer()
+
+
 async def begin_add_wizard(message: Message, state: FSMContext) -> None:
     await state.clear()
     await state.set_state(AddTrackingStates.choosing_mode)
@@ -826,60 +906,116 @@ async def finalize_tracking_creation(
 
 @router.message(Command("start"))
 async def start(message: Message) -> None:
-    async with session_scope() as session:
-        await ensure_user(session, message.from_user.id, message.from_user.username)
+    await answer_home_screen(message)
 
-    await message.answer(
-        "Привет! Я POE / POE2 ассистент для трекинга торговли, статистики и шаблонов.\n\n"
-        "Быстрый старт:\n"
-        "/add\n"
-        "/builds\n"
-        "/list\n"
-        "/account\n"
-        "/stash\n"
-        "/alerts\n"
-        "/economy\n"
-        "/templates\n\n"
-        "Через /add можно выбрать игру, лигу, предмет и порог без ручного ввода длинной команды."
-    )
+
+@router.message(Command("menu"))
+async def menu(message: Message) -> None:
+    await answer_home_screen(message)
 
 
 @router.message(Command("help"))
 async def help_command(message: Message) -> None:
-    await message.answer(
-        "Команды:\n"
-        "/add - открыть мастер добавления трекинга\n"
-        "/add <название>\n"
-        "/add <название> | <цена> [ex|chaos|div]\n"
-        "/add <trade_url>\n"
-        "/builds - подбор билд-направления по игре, бюджету и стилю\n"
-        "/remove <id> - отключить трекинг\n"
-        "/list - список активного трекинга\n"
-        "/account - привязка PoE аккаунта и статус подключения\n"
-        "/stash - панель stash-анализа и готовность к реальному скану\n"
-        "/alerts - сработавшие price alerts и быстрый перезапуск\n"
-        "/stats - статистика продаж\n"
-        "/economy - курсы валют и активные currency alerts\n"
-        "/templates - готовые наборы\n"
-        "/settings - текущие настройки MVP"
-    )
+    await message.answer(build_menu_help_text(), reply_markup=menu_section_keyboard(("Открыть меню", "menu:home")))
+
+
+@router.callback_query(F.data == "menu:home")
+async def menu_home(callback: CallbackQuery) -> None:
+    await edit_home_screen(callback)
+
+
+@router.callback_query(F.data == "menu:help")
+async def menu_help(callback: CallbackQuery) -> None:
+    if callback.message:
+        await callback.message.edit_text(
+            build_menu_help_text(),
+            reply_markup=menu_section_keyboard(("Домой", "menu:home"), include_home=False),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu:templates")
+async def menu_templates(callback: CallbackQuery) -> None:
+    if callback.message:
+        await callback.message.edit_text(
+            "Шаблоны\n\nГотовые наборы под игру, цель и стратегию применения.",
+            reply_markup=menu_section_keyboard(("Открыть шаблоны", "templates:choose_game")),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu:economy")
+async def menu_economy(callback: CallbackQuery) -> None:
+    text, keyboard = await load_economy_panel(callback.from_user.id, callback.from_user.username)
+    if callback.message:
+        await callback.message.edit_text(text, reply_markup=keyboard)
+    await callback.answer("Экономика обновлена")
+
+
+@router.callback_query(F.data == "menu:builds")
+async def menu_builds(callback: CallbackQuery) -> None:
+    if callback.message:
+        await callback.message.edit_text(
+            build_assistant_intro_text(),
+            reply_markup=with_home_button(build_game_keyboard()),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu:tracking")
+async def menu_tracking(callback: CallbackQuery) -> None:
+    text, keyboard = await load_tracking_panel(callback.from_user.id, callback.from_user.username)
+    if callback.message:
+        await callback.message.edit_text(text, reply_markup=keyboard)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu:alerts")
+async def menu_alerts(callback: CallbackQuery) -> None:
+    text, keyboard = await load_alerts_panel(callback.from_user.id, callback.from_user.username)
+    if callback.message:
+        await callback.message.edit_text(text, reply_markup=keyboard)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu:account")
+async def menu_account(callback: CallbackQuery) -> None:
+    text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username)
+    if callback.message:
+        await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu:stash")
+async def menu_stash(callback: CallbackQuery) -> None:
+    text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username)
+    if callback.message:
+        await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu:add")
+async def menu_add(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.message:
+        await begin_add_wizard(callback.message, state)
+    await callback.answer()
 
 
 @router.message(Command("account"))
 async def account(message: Message) -> None:
     text, keyboard = await load_account_panel(message.from_user.id, message.from_user.username)
-    await message.answer(text, reply_markup=keyboard)
+    await message.answer(text, reply_markup=with_home_button(keyboard))
 
 
 @router.message(Command("stash"))
 async def stash(message: Message) -> None:
     text, keyboard = await load_stash_panel(message.from_user.id, message.from_user.username)
-    await message.answer(text, reply_markup=keyboard)
+    await message.answer(text, reply_markup=with_home_button(keyboard))
 
 
 @router.message(Command("builds"))
 async def builds(message: Message) -> None:
-    await message.answer(build_assistant_intro_text(), reply_markup=build_game_keyboard())
+    await message.answer(build_assistant_intro_text(), reply_markup=with_home_button(build_game_keyboard()))
 
 
 @router.message(Command("add"))
@@ -1446,32 +1582,14 @@ async def reactivate_tracking_callback(callback: CallbackQuery) -> None:
 
 @router.message(Command("list"))
 async def list_tracking(message: Message) -> None:
-    async with session_scope() as session:
-        user = await ensure_user(session, message.from_user.id, message.from_user.username)
-        items = await TrackingService(session).list_items(user)
-
-    if not items:
-        await message.answer("Активного трекинга пока нет. Добавь предмет через /add.")
-        return
-
-    lines = [f"Активный трекинг: {len(items)}"]
-    for item in items:
-        lines.append("\n".join(build_tracking_lines(item)))
-
-    await message.answer(build_tracking_list_text(items), reply_markup=tracking_actions_keyboard(items))
+    text, keyboard = await load_tracking_panel(message.from_user.id, message.from_user.username)
+    await message.answer(text, reply_markup=keyboard)
 
 
 @router.message(Command("alerts"))
 async def paused_alerts(message: Message) -> None:
-    async with session_scope() as session:
-        user = await ensure_user(session, message.from_user.id, message.from_user.username)
-        items = await TrackingService(session).list_paused_price_alerts(user)
-
-    if not items:
-        await message.answer("Сработавших price alerts пока нет. Когда alert сработает, он появится здесь.")
-        return
-
-    await message.answer(build_paused_alerts_text(items), reply_markup=paused_alerts_keyboard(items))
+    text, keyboard = await load_alerts_panel(message.from_user.id, message.from_user.username)
+    await message.answer(text, reply_markup=keyboard)
 
 
 @router.callback_query(F.data == "alerts:reactivate_all")
@@ -1574,7 +1692,7 @@ async def refresh_account_panel(callback: CallbackQuery) -> None:
     text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username)
     await callback.answer("Статус обновлён")
     if callback.message:
-        await callback.message.edit_text(text, reply_markup=keyboard)
+        await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))
 
 
 @router.callback_query(F.data == "account:disconnect")
@@ -1590,7 +1708,7 @@ async def disconnect_account(callback: CallbackQuery) -> None:
     text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username)
     await callback.answer("PoE аккаунт отключён")
     if callback.message:
-        await callback.message.edit_text(text, reply_markup=keyboard)
+        await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))
 
 
 @router.callback_query(F.data == "stash:refresh")
@@ -1598,7 +1716,7 @@ async def refresh_stash_panel(callback: CallbackQuery) -> None:
     text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username)
     await callback.answer("Stash-панель обновлена")
     if callback.message:
-        await callback.message.edit_text(text, reply_markup=keyboard)
+        await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))
 
 
 @router.callback_query(F.data == "stash:back:panel")
@@ -1606,7 +1724,7 @@ async def stash_back_to_panel(callback: CallbackQuery) -> None:
     text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username)
     await callback.answer()
     if callback.message:
-        await callback.message.edit_text(text, reply_markup=keyboard)
+        await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))
 
 
 @router.callback_query(F.data.startswith("stash:guide:"))
@@ -1626,13 +1744,13 @@ async def stash_open_account_panel(callback: CallbackQuery) -> None:
     text, keyboard = await load_account_panel(callback.from_user.id, callback.from_user.username)
     await callback.answer("Открываю панель аккаунта")
     if callback.message:
-        await callback.message.edit_text(text, reply_markup=keyboard)
+        await callback.message.edit_text(text, reply_markup=with_home_button(keyboard))
 
 
 @router.callback_query(F.data == "builds:back:game")
 async def builds_back_to_game(callback: CallbackQuery) -> None:
     if callback.message:
-        await callback.message.edit_text(build_assistant_intro_text(), reply_markup=build_game_keyboard())
+        await callback.message.edit_text(build_assistant_intro_text(), reply_markup=with_home_button(build_game_keyboard()))
     await callback.answer()
 
 
@@ -1813,11 +1931,8 @@ async def stats(message: Message) -> None:
 
 @router.message(Command("economy"))
 async def economy(message: Message) -> None:
-    async with session_scope() as session:
-        user = await ensure_user(session, message.from_user.id, message.from_user.username)
-        summaries, overview = await EconomyService(session).get_user_economy_dashboard(user)
-
-    await message.answer(build_economy_text(summaries, overview))
+    text, keyboard = await load_economy_panel(message.from_user.id, message.from_user.username)
+    await message.answer(text, reply_markup=keyboard)
 
 
 @router.message(Command("templates"))
@@ -1827,7 +1942,7 @@ async def templates(message: Message) -> None:
 
     await message.answer(
         "Шаблоны:\nСначала выбери игру, и я покажу только релевантные наборы.",
-        reply_markup=template_browser_game_keyboard(),
+        reply_markup=with_home_button(template_browser_game_keyboard()),
     )
 
 
@@ -1835,7 +1950,7 @@ async def templates(message: Message) -> None:
 async def templates_choose_game(callback: CallbackQuery) -> None:
     await callback.message.edit_text(
         "Шаблоны:\nСнова выбери игру, и я покажу релевантные цели и наборы.",
-        reply_markup=template_browser_game_keyboard(),
+        reply_markup=with_home_button(template_browser_game_keyboard()),
     )
     await callback.answer()
 
@@ -2126,7 +2241,10 @@ async def activate_template_for_league(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "template:cancel")
 async def cancel_template_activation(callback: CallbackQuery) -> None:
-    await callback.message.edit_text("Ок, отменил подключение шаблона.")
+    await callback.message.edit_text(
+        "Ок, отменил подключение шаблона.",
+        reply_markup=menu_section_keyboard(("Домой", "menu:home"), include_home=False),
+    )
     await callback.answer("Отменено")
 
 
