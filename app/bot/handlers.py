@@ -861,7 +861,7 @@ async def load_tracking_panel(telegram_id: int, username: str | None, telegram_l
         empty_text = (
             "No active tracking yet. Use /add to create your first watcher."
             if locale != 'ru'
-            else "????????? ???????? ???? ???. ?????? ??????? ????? /add."
+            else "Активного трекинга пока нет. Добавь первый вотчер через /add."
         )
         return empty_text, menu_section_keyboard((tr(locale, 'add_tracking'), 'menu:add'), locale=locale)
     return build_tracking_list_text(items), with_home_button(tracking_actions_keyboard(items, locale=locale), locale=locale)
@@ -877,7 +877,7 @@ async def load_alerts_panel(telegram_id: int, username: str | None, telegram_loc
         empty_text = (
             "No triggered price alerts yet. When an alert fires, it will appear here so you can restart it quickly."
             if locale != 'ru'
-            else "??????????? price alerts ???? ???. ????? alert ?????????, ?? ???????? ?????, ? ??? ????? ????? ?????? ?????????????."
+            else "Сработавших price alerts пока нет. Когда alert сработает, он появится здесь, и его можно будет быстро перезапустить."
         )
         return empty_text, menu_section_keyboard((tr(locale, 'open_economy'), 'menu:economy'), locale=locale)
     return build_paused_alerts_text(items), with_home_button(paused_alerts_keyboard(items, locale=locale), locale=locale)
@@ -890,8 +890,8 @@ async def load_economy_panel(telegram_id: int, username: str | None, telegram_lo
         locale = normalize_locale(user.language or telegram_locale or DEFAULT_LOCALE)
 
     return build_economy_text(summaries, overview), menu_section_keyboard(
-        ("Refresh economy" if locale != 'ru' else "???????? ?????????", 'menu:economy'),
-        ("Open alerts" if locale != 'ru' else "??????? alerts", 'menu:alerts'),
+        ("Refresh economy" if locale != 'ru' else "Обновить экономику", 'menu:economy'),
+        ("Open alerts" if locale != 'ru' else "Открыть alerts", 'menu:alerts'),
         locale=locale,
     )
 
