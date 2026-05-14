@@ -370,7 +370,8 @@ def build_home_text(locale: str = DEFAULT_LOCALE) -> str:
         f"- {tr(locale, 'welcome_feature_economy')}\n"
         f"- {tr(locale, 'welcome_feature_builds')}\n"
         f"- {tr(locale, 'welcome_feature_tracking')}\n"
-        f"- {tr(locale, 'welcome_feature_account')}"
+        f"- {tr(locale, 'welcome_feature_account')}\n\n"
+        f"{tr(locale, 'welcome_disclaimer')}"
     )
 
 
