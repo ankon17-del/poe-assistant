@@ -192,7 +192,7 @@ class PoeAccountApiService:
                 [
                     tab
                     for tab in tab_overviews
-                    if not tab.is_special and tab.item_count >= 20
+                    if not tab.is_special and tab.item_count >= 40
                 ],
                 key=lambda tab: (-tab.item_count, tab.name),
             )[:4]
@@ -348,6 +348,8 @@ class PoeAccountApiService:
             return f"{name} ({label})"
         if label:
             return label
+        if name.isdigit():
+            return f"Tab {name}"
         return name or raw_type
 
     @staticmethod
@@ -362,8 +364,10 @@ class PoeAccountApiService:
         stack_size = item.get("stackSize")
         prefix = f"{stack_size}x " if isinstance(stack_size, int) and stack_size > 1 else ""
         if name and type_line:
-            return f"{prefix}{name} {type_line}".strip()
-        return f"{prefix}{name or type_line or 'item'}".strip()
+            text = f"{prefix}{name} {type_line}".strip()
+        else:
+            text = f"{prefix}{name or type_line or 'item'}".strip()
+        return text[:48] + "..." if len(text) > 48 else text
 
     @staticmethod
     def choose_primary_poe1_league(leagues: tuple[str, ...], fallback_default: str | None = None) -> str | None:

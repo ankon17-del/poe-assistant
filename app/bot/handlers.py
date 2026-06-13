@@ -242,6 +242,87 @@ def build_account_text(*, integration, oauth_config_error: str | None, locale: s
     return "\n".join(lines)
 
 
+def _stash_preview_text(tab) -> str:
+    preview_items = tuple(item for item in tab.preview_items[:2] if item)
+    return ", ".join(preview_items)
+
+
+def _build_stash_takeaways(live, locale: str) -> tuple[str, ...]:
+    copy = {
+        "ru": {
+            "liquid": "Открой {name}: {count} предметов{reason}. Это лучший кандидат на быструю продажу.",
+            "liquid_preview": "Открой {name}: {count} предметов{reason}. Начни с него. Например: {preview}.",
+            "dump": "Разбери {name}: {count} предметов в обычной вкладке, это похоже на dump-tab.",
+            "dump_preview": "Разбери {name}: {count} предметов в обычной вкладке. Например: {preview}.",
+            "dense": "Проверь {name}: вкладка очень плотная ({count} предметов), там легко пропустить что-то ценное.",
+            "dense_preview": "Проверь {name}: вкладка очень плотная ({count} предметов). Например: {preview}.",
+            "empty": "Есть {count} пустых вкладок: можно выделить одну под продажу, а вторую под сортировку.",
+        },
+        "en": {
+            "liquid": "Open {name}: {count} items{reason}. This is your best quick-sale candidate.",
+            "liquid_preview": "Open {name}: {count} items{reason}. Start there. For example: {preview}.",
+            "dump": "Sort {name}: {count} items in a regular tab, so it looks like a dump tab.",
+            "dump_preview": "Sort {name}: {count} items in a regular tab. For example: {preview}.",
+            "dense": "Check {name}: it is very dense ({count} items), so valuable pieces are easy to miss.",
+            "dense_preview": "Check {name}: it is very dense ({count} items). For example: {preview}.",
+            "empty": "You have {count} empty tabs: keep one for selling and one for sorting.",
+        },
+        "fr": {
+            "liquid": "Ouvre {name} : {count} objets{reason}. C'est le meilleur candidat pour une vente rapide.",
+            "liquid_preview": "Ouvre {name} : {count} objets{reason}. Commence par lui. Par exemple : {preview}.",
+            "dump": "Trie {name} : {count} objets dans un onglet normal, cela ressemble à un dump tab.",
+            "dump_preview": "Trie {name} : {count} objets dans un onglet normal. Par exemple : {preview}.",
+            "dense": "Vérifie {name} : l'onglet est très chargé ({count} objets), donc on peut y rater quelque chose de précieux.",
+            "dense_preview": "Vérifie {name} : l'onglet est très chargé ({count} objets). Par exemple : {preview}.",
+            "empty": "Tu as {count} onglets vides : garde-en un pour la vente et un pour le tri.",
+        },
+        "de": {
+            "liquid": "Öffne {name}: {count} Items{reason}. Das ist dein bester Kandidat für einen schnellen Verkauf.",
+            "liquid_preview": "Öffne {name}: {count} Items{reason}. Fang dort an. Zum Beispiel: {preview}.",
+            "dump": "Sortiere {name}: {count} Items in einem normalen Tab, das sieht nach einem Dump-Tab aus.",
+            "dump_preview": "Sortiere {name}: {count} Items in einem normalen Tab. Zum Beispiel: {preview}.",
+            "dense": "Prüfe {name}: Der Tab ist sehr voll ({count} Items), dort übersieht man leicht etwas Wertvolles.",
+            "dense_preview": "Prüfe {name}: Der Tab ist sehr voll ({count} Items). Zum Beispiel: {preview}.",
+            "empty": "Du hast {count} leere Tabs: einen kannst du für Verkäufe und einen fürs Sortieren reservieren.",
+        },
+    }
+    trm = copy.get(locale, copy["en"])
+    takeaways: list[str] = []
+
+    if live.liquid_tabs:
+        tab = live.liquid_tabs[0]
+        reason = f" ({tab.priority_reason})" if tab.priority_reason else ""
+        preview = _stash_preview_text(tab)
+        template = trm["liquid_preview"] if preview else trm["liquid"]
+        takeaways.append(template.format(name=tab.name, count=tab.item_count, reason=reason, preview=preview))
+
+    if live.dump_tabs:
+        tab = live.dump_tabs[0]
+        preview = _stash_preview_text(tab)
+        template = trm["dump_preview"] if preview else trm["dump"]
+        takeaways.append(template.format(name=tab.name, count=tab.item_count, preview=preview))
+    elif live.dense_tabs:
+        tab = live.dense_tabs[0]
+        preview = _stash_preview_text(tab)
+        template = trm["dense_preview"] if preview else trm["dense"]
+        takeaways.append(template.format(name=tab.name, count=tab.item_count, preview=preview))
+
+    if live.empty_tabs >= 2:
+        takeaways.append(trm["empty"].format(count=live.empty_tabs))
+
+    return tuple(takeaways[:3])
+
+
+def _build_stash_tab_line(tab, include_reason: bool = False) -> str:
+    line = f"- {tab.name}: {tab.item_count}"
+    if include_reason and tab.priority_reason:
+        line += f" ({tab.priority_reason})"
+    preview = _stash_preview_text(tab)
+    if preview:
+        line += f" | {preview}"
+    return line
+
+
 def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
     copy = {
         "ru": {
@@ -257,6 +338,7 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "empty": "пустых вкладок",
             "items": "предметов в просмотренных вкладках",
             "sample": "Примеры вкладок",
+            "takeaways": "What to do first",
             "liquid": "Что проверить первым",
             "dense": "Самые плотные вкладки",
             "dump": "Что похоже на dump-разбор",
@@ -275,6 +357,7 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "special": "special tabs",
             "empty": "empty tabs",
             "items": "items in reviewed tabs",
+            "takeaways": "What to do first",
             "sample": "Sample tabs",
             "liquid": "Check these first",
             "dense": "Densest tabs",
@@ -294,6 +377,7 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "special": "onglets spéciaux",
             "empty": "onglets vides",
             "items": "objets dans les onglets analysés",
+            "takeaways": "Par quoi commencer",
             "sample": "Exemples d'onglets",
             "liquid": "À vérifier en premier",
             "dense": "Onglets les plus chargés",
@@ -313,6 +397,7 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "special": "Spezial-Tabs",
             "empty": "leere Tabs",
             "items": "Items in geprüften Tabs",
+            "takeaways": "Womit du anfangen solltest",
             "sample": "Beispiel-Tabs",
             "liquid": "Das zuerst prüfen",
             "dense": "Dichteste Tabs",
@@ -354,32 +439,27 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
         lines.append(f"- {live.total_items} {trm['items']}")
         if live.sample_tabs:
             lines.append(f"- {trm['sample']}: {', '.join(live.sample_tabs)}")
+        takeaways = _build_stash_takeaways(live, locale)
+        if takeaways:
+            lines.append("")
+            lines.append(f"{trm['takeaways']}:")
+            for takeaway in takeaways:
+                lines.append(f"- {takeaway}")
         if live.liquid_tabs:
             lines.append("")
             lines.append(f"{trm['liquid']}:")
             for tab in live.liquid_tabs:
-                line = f"- {tab.name}: {tab.item_count}"
-                if tab.priority_reason:
-                    line += f" ({tab.priority_reason})"
-                if tab.preview_items:
-                    line += f" — {', '.join(tab.preview_items)}"
-                lines.append(line)
+                lines.append(_build_stash_tab_line(tab, include_reason=True))
         if live.dense_tabs:
             lines.append("")
             lines.append(f"{trm['dense']}:")
             for tab in live.dense_tabs:
-                line = f"- {tab.name}: {tab.item_count}"
-                if tab.preview_items:
-                    line += f" — {', '.join(tab.preview_items)}"
-                lines.append(line)
+                lines.append(_build_stash_tab_line(tab))
         if live.dump_tabs:
             lines.append("")
             lines.append(f"{trm['dump']}:")
             for tab in live.dump_tabs:
-                line = f"- {tab.name}: {tab.item_count}"
-                if tab.preview_items:
-                    line += f" — {', '.join(tab.preview_items)}"
-                lines.append(line)
+                lines.append(_build_stash_tab_line(tab))
     elif summary.live_error:
         lines.append("")
         lines.append(f"{trm['live']} {summary.live_error}")
