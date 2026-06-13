@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urlparse
 
@@ -58,6 +59,7 @@ from app.services.tracking import TrackingService
 from app.services.users import UserService
 
 router = Router()
+STASH_PANEL_TIMEOUT_SECONDS = 12
 
 
 class AddTrackingStates(StatesGroup):
@@ -1145,10 +1147,16 @@ async def load_account_panel(telegram_id: int, username: str | None, telegram_lo
     return text, keyboard
 
 
-async def load_stash_panel(telegram_id: int, username: str | None, telegram_locale: str | None = None) -> tuple[str, object]:
+async def load_stash_panel(
+    telegram_id: int,
+    username: str | None,
+    telegram_locale: str | None = None,
+    *,
+    include_live: bool = True,
+) -> tuple[str, object]:
     async with session_scope() as session:
         user = await ensure_user(session, telegram_id, username)
-        summary = await StashService(session).get_panel_summary(user)
+        summary = await StashService(session).get_panel_summary(user, include_live=include_live)
         locale = normalize_locale(user.language or telegram_locale or DEFAULT_LOCALE)
 
     connect_url = None
@@ -1180,6 +1188,32 @@ def stash_loading_failed_text(locale: str = DEFAULT_LOCALE) -> str:
         "de": "Die Stash-Analyse konnte beim ersten Versuch nicht aktualisiert werden. Bitte versuche /stash oder die Aktualisierung etwas später erneut.",
     }
     return copy.get(locale, copy["en"])
+
+
+def stash_loading_timeout_text(locale: str = DEFAULT_LOCALE) -> str:
+    copy = {
+        "ru": "Live stash-анализ занял слишком много времени, поэтому пока показываю быструю сводку по аккаунту. Полный market/pass можно повторить чуть позже через обновление.",
+        "en": "The live stash scan took too long, so for now I am showing a fast account summary. You can retry the full market pass a bit later with refresh.",
+        "fr": "L'analyse live du coffre a pris trop de temps, donc j'affiche pour l'instant un rГ©sumГ© rapide du compte. Tu pourras relancer l'analyse complГЁte un peu plus tard.",
+        "de": "Der Live-Stash-Scan hat zu lange gedauert, daher zeige ich vorerst eine schnelle KontoГјbersicht. Den vollstГ¤ndigen Markt-Scan kannst du spГ¤ter erneut starten.",
+    }
+    return copy.get(locale, copy["en"])
+
+
+async def load_stash_panel_with_fallback(
+    telegram_id: int,
+    username: str | None,
+    telegram_locale: str | None = None,
+) -> tuple[str, object]:
+    locale = await load_user_locale(telegram_id, username, telegram_locale)
+    try:
+        return await asyncio.wait_for(
+            load_stash_panel(telegram_id, username, telegram_locale, include_live=True),
+            timeout=STASH_PANEL_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        text, keyboard = await load_stash_panel(telegram_id, username, telegram_locale, include_live=False)
+        return f"{stash_loading_timeout_text(locale)}\n\n{text}", keyboard
 
 
 async def load_tracking_panel(telegram_id: int, username: str | None, telegram_locale: str | None = None) -> tuple[str, object]:
@@ -1528,7 +1562,11 @@ async def menu_stash_open(callback: CallbackQuery) -> None:
     if callback.message:
         await callback.message.edit_text(stash_loading_text(locale))
         try:
-            text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
+            text, keyboard = await load_stash_panel_with_fallback(
+                callback.from_user.id,
+                callback.from_user.username,
+                callback.from_user.language_code,
+            )
             await callback.message.edit_text(text, reply_markup=keyboard)
         except Exception:
             await callback.message.edit_text(stash_loading_failed_text(locale))
@@ -1553,7 +1591,11 @@ async def stash(message: Message) -> None:
     locale = await load_user_locale(message.from_user.id, message.from_user.username, message.from_user.language_code)
     loading_message = await message.answer(stash_loading_text(locale))
     try:
-        text, keyboard = await load_stash_panel(message.from_user.id, message.from_user.username, message.from_user.language_code)
+        text, keyboard = await load_stash_panel_with_fallback(
+            message.from_user.id,
+            message.from_user.username,
+            message.from_user.language_code,
+        )
         await loading_message.edit_text(text, reply_markup=keyboard)
     except Exception:
         await loading_message.edit_text(stash_loading_failed_text(locale))
@@ -2300,7 +2342,11 @@ async def refresh_stash_panel(callback: CallbackQuery) -> None:
     if callback.message:
         await callback.message.edit_text(stash_loading_text(locale))
         try:
-            text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
+            text, keyboard = await load_stash_panel_with_fallback(
+                callback.from_user.id,
+                callback.from_user.username,
+                callback.from_user.language_code,
+            )
             await callback.message.edit_text(text, reply_markup=keyboard)
         except Exception:
             await callback.message.edit_text(stash_loading_failed_text(locale))
@@ -2314,7 +2360,11 @@ async def stash_back_to_panel(callback: CallbackQuery) -> None:
     if callback.message:
         await callback.message.edit_text(stash_loading_text(locale))
         try:
-            text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
+            text, keyboard = await load_stash_panel_with_fallback(
+                callback.from_user.id,
+                callback.from_user.username,
+                callback.from_user.language_code,
+            )
             await callback.message.edit_text(text, reply_markup=keyboard)
         except Exception:
             await callback.message.edit_text(stash_loading_failed_text(locale))

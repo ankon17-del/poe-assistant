@@ -184,7 +184,7 @@ class StashService:
         self.currency_market_source = CurrencyMarketSource()
         self.stash_market_source = StashMarketSource()
 
-    async def get_panel_summary(self, user: User) -> StashPanelSummary:
+    async def get_panel_summary(self, user: User, *, include_live: bool = True) -> StashPanelSummary:
         integration = await IntegrationService(self.session).get_by_type(user, IntegrationType.poe_oauth)
 
         oauth_available = bool(
@@ -208,7 +208,7 @@ class StashService:
         priced_candidates: tuple[PricedStashCandidate, ...] = ()
         valuation_source: str | None = None
         estimated_liquid_chaos: float | None = None
-        if integration and stash_scopes_ready:
+        if include_live and integration and stash_scopes_ready:
             try:
                 live_snapshot = await PoeAccountApiService(self.session).get_stash_snapshot(user)
                 if live_snapshot:
