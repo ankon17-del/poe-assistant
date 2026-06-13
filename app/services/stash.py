@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.integrations.currency_market_source import CurrencyMarketSource
+from app.integrations.stash_market_source import MarketPriceEntry, StashMarketSource
 from app.integrations.tracking_source import TrackingRequest
 from app.models.enums import IntegrationType
 from app.models.user import User
@@ -181,6 +182,7 @@ class StashService:
         self.session = session
         self.settings = get_settings()
         self.currency_market_source = CurrencyMarketSource()
+        self.stash_market_source = StashMarketSource()
 
     async def get_panel_summary(self, user: User) -> StashPanelSummary:
         integration = await IntegrationService(self.session).get_by_type(user, IntegrationType.poe_oauth)
@@ -298,47 +300,57 @@ class StashService:
         candidates: list[PricedStashCandidate] = []
         source_labels: list[str] = []
         total_estimated = Decimal("0")
-        supported_tab_types = {"CurrencyStash", "FragmentStash"}
+        supported_tab_types = {
+            "CurrencyStash",
+            "FragmentStash",
+            "EssenceStash",
+            "DivinationCardStash",
+            "MapStash",
+        }
 
-        lookup_rows: list[tuple[str, str, int]] = []
+        lookup_rows: list[tuple[str, str, str, int]] = []
+        tab_types = {
+            tab.type
+            for tab in snapshot.tabs
+            if tab.type in supported_tab_types and tab.item_summaries
+        }
+        if not tab_types:
+            return (), None, None
+
+        market_indexes: dict[str, dict[str, Decimal]] = {}
+        for tab_type in sorted(tab_types):
+            result = await self.stash_market_source.get_price_index(
+                league_name=snapshot.league_name,
+                stash_type=tab_type,
+            )
+            if result is None and tab_type == "CurrencyStash":
+                result = await self._build_currency_index_from_exchange(snapshot.league_name)
+            if result is None:
+                continue
+            price_index, source_label = result
+            source_labels.append(source_label)
+            market_indexes[tab_type] = {
+                self._normalize_market_name(entry.name): entry.chaos_value
+                for entry in price_index.values()
+            }
+
         for tab in snapshot.tabs:
-            if tab.type not in supported_tab_types:
+            tab_index = market_indexes.get(tab.type)
+            if not tab_index:
                 continue
             for item in tab.item_summaries:
-                lookup_rows.append((tab.name, item.name, item.quantity))
+                lookup_rows.append((tab.type, tab.name, item.name, item.quantity))
 
         if not lookup_rows:
             return (), None, None
 
-        price_snapshots: dict[str, tuple[Decimal, str]] = {}
-        for _, item_name, _ in lookup_rows:
-            if item_name in price_snapshots:
+        for tab_type, tab_name, item_name, quantity in lookup_rows:
+            tab_index = market_indexes.get(tab_type)
+            if not tab_index:
                 continue
-            price = await self.currency_market_source.get_price(
-                TrackingRequest(
-                    tracked_item_id=0,
-                    item_name=item_name,
-                    item_type="currency",
-                    trade_url=None,
-                    target_price=None,
-                    target_currency="chaos",
-                    league_name=snapshot.league_name,
-                    game="poe1",
-                )
-            )
-            if price is None:
+            unit_price = self._lookup_market_price(tab_index, item_name)
+            if unit_price is None:
                 continue
-            chaos_value = price.quote_values.get("chaos") or price.market_value
-            if chaos_value is None:
-                continue
-            price_snapshots[item_name] = (chaos_value, price.source)
-
-        for tab_name, item_name, quantity in lookup_rows:
-            priced = price_snapshots.get(item_name)
-            if priced is None:
-                continue
-            unit_price, source_label = priced
-            source_labels.append(source_label)
             total_price = unit_price * quantity
             total_estimated += total_price
             if total_price < 5:
@@ -358,6 +370,54 @@ class StashService:
         unique_sources = list(dict.fromkeys(source_labels))
         estimate = float(total_estimated) if total_estimated > 0 else None
         return tuple(candidates[:8]), (", ".join(unique_sources) if unique_sources else None), estimate
+
+    async def _build_currency_index_from_exchange(
+        self,
+        league_name: str,
+    ) -> tuple[dict[str, MarketPriceEntry], str] | None:
+        exchange_rates = await self.currency_market_source.get_exchange_rates(league_name=league_name, game="poe1")
+        if not exchange_rates:
+            return None
+
+        price_index: dict[str, MarketPriceEntry] = {}
+        aliases = {
+            "Chaos Orb": exchange_rates.get("chaos"),
+            "Exalted Orb": exchange_rates.get("ex"),
+            "Divine Orb": exchange_rates.get("div"),
+        }
+        for item_name, chaos_value in aliases.items():
+            if chaos_value in {None, Decimal("0")}:
+                continue
+            price_index[self._normalize_market_name(item_name)] = MarketPriceEntry(
+                name=item_name,
+                chaos_value=chaos_value,
+                source="exchange snapshot",
+            )
+        if not price_index:
+            return None
+        return price_index, "exchange snapshot"
+
+    @staticmethod
+    def _normalize_market_name(value: str) -> str:
+        return "".join(ch for ch in value.lower() if ch.isalnum())
+
+    @classmethod
+    def _lookup_market_price(
+        cls,
+        tab_index: dict[str, Decimal],
+        item_name: str,
+    ) -> Decimal | None:
+        candidates = [item_name]
+        if ">>" in item_name:
+            candidates.append(item_name.split(">>", 1)[0].strip())
+        if "(" in item_name:
+            candidates.append(item_name.split("(", 1)[0].strip())
+
+        for candidate in candidates:
+            normalized = cls._normalize_market_name(candidate)
+            if normalized in tab_index:
+                return tab_index[normalized]
+        return None
 
     @classmethod
     def list_guides(cls) -> tuple[StashGuide, ...]:
