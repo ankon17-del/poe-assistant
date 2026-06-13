@@ -177,6 +177,57 @@ def stash_tab_type_label(tab_type: str, locale: str = DEFAULT_LOCALE) -> str:
     return localized.get(tab_type, tab_type)
 
 
+def build_fast_cash_notes(summary, locale: str = DEFAULT_LOCALE) -> tuple[str, ...]:
+    if not summary.tab_totals:
+        return ()
+
+    copy = {
+        "ru": {
+            "currency": "Начни с {tab_name}: там примерно {total} chaos в ликвидной валюте. Сначала проверь {item_name}.",
+            "fragments": "Открой {tab_name}: там примерно {total} chaos во фрагментах и scarabs. Сначала проверь {item_name}.",
+            "essences": "Проверь {tab_name}: там примерно {total} chaos в эссенциях. Сначала проверь {item_name}.",
+            "div_cards": "Зайди в {tab_name}: там примерно {total} chaos в карточках. Сначала проверь {item_name}.",
+            "maps": "Посмотри {tab_name}: там примерно {total} chaos в картах. Сначала проверь {item_name}.",
+            "other": "Начни с {tab_name}: там примерно {total} chaos. Сначала проверь {item_name}.",
+        },
+        "en": {
+            "currency": "Start with {tab_name}: around {total} chaos in liquid currency. Check {item_name} first.",
+            "fragments": "Open {tab_name}: around {total} chaos in fragments and scarabs. Check {item_name} first.",
+            "essences": "Check {tab_name}: around {total} chaos in essences. Check {item_name} first.",
+            "div_cards": "Open {tab_name}: around {total} chaos in div cards. Check {item_name} first.",
+            "maps": "Check {tab_name}: around {total} chaos in maps. Check {item_name} first.",
+            "other": "Start with {tab_name}: around {total} chaos. Check {item_name} first.",
+        },
+    }
+    localized = copy.get(locale, copy["en"])
+
+    tab_candidates: dict[str, list] = {}
+    for candidate in summary.priced_candidates:
+        tab_candidates.setdefault(candidate.tab_name, []).append(candidate)
+
+    notes: list[str] = []
+    for tab_total in summary.tab_totals[:3]:
+        candidates = tab_candidates.get(tab_total.tab_name, [])
+        top_candidate = candidates[0] if candidates else None
+        category_key = {
+            "CurrencyStash": "currency",
+            "FragmentStash": "fragments",
+            "EssenceStash": "essences",
+            "DivinationCardStash": "div_cards",
+            "MapStash": "maps",
+        }.get(tab_total.tab_type, "other")
+        total_text = format_market_value(Decimal(str(tab_total.total_price_chaos)))
+        item_name = top_candidate.item_name if top_candidate else stash_tab_type_label(tab_total.tab_type, locale)
+        notes.append(
+            localized[category_key].format(
+                tab_name=tab_total.tab_name,
+                total=total_text,
+                item_name=item_name,
+            )
+        )
+    return tuple(notes)
+
+
 def build_tracking_lines(item) -> list[str]:
     league_name = item.league.name if item.league else "Без лиги"
     game_label = "POE 2" if item.league and item.league.realm == "poe2" else "POE 1"
@@ -538,6 +589,12 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
         "fr": "Top tabs by value",
         "de": "Top tabs by value",
     }.get(locale, "Top tabs by value")
+    fast_cash_label = {
+        "ru": "Быстрый cash-out",
+        "en": "Quick cash-out",
+        "fr": "Quick cash-out",
+        "de": "Quick cash-out",
+    }.get(locale, "Quick cash-out")
     quick_open_label = {
         "ru": "Что открыть прямо сейчас",
         "en": "Open these tabs first",
@@ -631,6 +688,12 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
                     )
                     lines.append(f"- {index}) {tab_total.tab_name} ({tab_type_name}) ~ {total_text} chaos")
                 lines.append("")
+                fast_cash_notes = build_fast_cash_notes(summary, locale)
+                if fast_cash_notes:
+                    lines.append(f"{fast_cash_label}:")
+                    for note in fast_cash_notes:
+                        lines.append(f"- {note}")
+                    lines.append("")
                 lines.append(f"{top_tabs_label}:")
                 for tab_total in summary.tab_totals:
                     total_text = format_market_value(Decimal(str(tab_total.total_price_chaos)))
