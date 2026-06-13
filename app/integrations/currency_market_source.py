@@ -361,39 +361,64 @@ class CurrencyMarketSource:
 
     async def _fetch_poe1_currency_overview(self, league_name: str) -> dict[str, Any]:
         async with httpx.AsyncClient(base_url=self.poe_ninja_base_url, timeout=30.0) as client:
-            last_response: httpx.Response | None = None
+            last_payload: dict[str, Any] | None = None
+            last_candidate = league_name
             for candidate_league in self._poe1_league_candidates(league_name):
-                candidate_params = [
-                    {"league": candidate_league, "type": "Currency", "language": "en"},
-                    {"league": candidate_league, "type": "Currency", "date": date.today().isoformat(), "language": "en"},
-                    {
-                        "league": candidate_league,
-                        "type": "Currency",
-                        "date": (date.today() - timedelta(days=1)).isoformat(),
-                        "language": "en",
-                    },
-                ]
+                response = await client.get(
+                    "/poe1/api/economy/exchange/current/overview",
+                    params={"league": candidate_league, "type": "Currency"},
+                )
+                if response.status_code >= 400:
+                    continue
 
-                for params in candidate_params:
-                    response = await client.get(
-                        "/api/data/currencyoverview",
-                        params=params,
-                    )
-                    last_response = response
-                    if response.status_code >= 400:
-                        continue
+                payload = response.json()
+                last_payload = payload
+                adapted = self._adapt_poe1_exchange_overview_payload(payload)
+                lines = adapted.get("lines", [])
+                if isinstance(lines, list) and lines:
+                    adapted["_resolved_league"] = candidate_league
+                    return adapted
+                last_candidate = candidate_league
 
-                    payload = response.json()
-                    lines = payload.get("lines", [])
-                    if isinstance(lines, list) and lines:
-                        payload["_resolved_league"] = candidate_league
-                        return payload
+            if last_payload is None:
+                raise httpx.HTTPError("No response received from poe.ninja exchange overview")
 
-            if last_response is None:
-                raise httpx.HTTPError("No response received from poe.ninja currency overview")
+            adapted = self._adapt_poe1_exchange_overview_payload(last_payload)
+            adapted["_resolved_league"] = last_candidate
+            return adapted
 
-            last_response.raise_for_status()
-            return last_response.json()
+    @classmethod
+    def _adapt_poe1_exchange_overview_payload(cls, payload: dict[str, Any]) -> dict[str, Any]:
+        items = payload.get("items", [])
+        lines = payload.get("lines", [])
+        if not isinstance(items, list) or not isinstance(lines, list):
+            return {"lines": []}
+
+        items_by_id = {
+            str(item.get("id")): item
+            for item in items
+            if isinstance(item, dict) and item.get("id") is not None
+        }
+
+        adapted_lines: list[dict[str, Any]] = []
+        for line in lines:
+            if not isinstance(line, dict):
+                continue
+            item = items_by_id.get(str(line.get("id")))
+            if item is None:
+                continue
+            primary_value = cls._extract_decimal(line.get("primaryValue"))
+            if primary_value is None:
+                continue
+            adapted_lines.append(
+                {
+                    "name": item.get("name"),
+                    "currencyTypeName": item.get("name"),
+                    "detailsId": item.get("detailsId"),
+                    "chaosEquivalent": primary_value,
+                }
+            )
+        return {"lines": adapted_lines}
 
     async def _get_poe2_exchange_snapshot(self, league_name: str) -> ExchangeRateSnapshotDTO | None:
         try:

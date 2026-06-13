@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -67,43 +66,32 @@ class StashMarketSource:
             last_payload: dict[str, Any] | None = None
             last_candidate = league_name
             for candidate_league in self._league_candidates(league_name):
-                for params in self._candidate_params(candidate_league, market_type):
-                    response = await client.get(f"/api/data/{endpoint}", params=params)
-                    if response.status_code >= 400:
-                        continue
-                    payload = response.json()
-                    last_payload = payload
-                    lines = payload.get("lines", [])
-                    if isinstance(lines, list) and lines:
-                        index = self._build_price_index(lines)
-                        if index:
-                            self._cache[cache_key] = index
-                            source = "poe.ninja"
-                            if candidate_league.lower() != league_name.lower():
-                                source = f"poe.ninja ({candidate_league} fallback)"
-                            return index, source
-                    last_candidate = candidate_league
-
-        if last_payload:
-            lines = last_payload.get("lines", [])
-            if isinstance(lines, list) and lines:
-                index = self._build_price_index(lines)
+                response = await client.get(
+                    "/poe1/api/economy/exchange/current/overview",
+                    params={"league": candidate_league, "type": market_type},
+                )
+                if response.status_code >= 400:
+                    continue
+                payload = response.json()
+                last_payload = payload
+                index = self._build_price_index(payload)
                 if index:
                     self._cache[cache_key] = index
                     source = "poe.ninja"
-                    if last_candidate.lower() != league_name.lower():
-                        source = f"poe.ninja ({last_candidate} fallback)"
+                    if candidate_league.lower() != league_name.lower():
+                        source = f"poe.ninja ({candidate_league} fallback)"
                     return index, source
-        return None
+                last_candidate = candidate_league
 
-    @staticmethod
-    def _candidate_params(league_name: str, market_type: str) -> list[dict[str, str]]:
-        today = date.today()
-        return [
-            {"league": league_name, "type": market_type, "language": "en"},
-            {"league": league_name, "type": market_type, "date": today.isoformat(), "language": "en"},
-            {"league": league_name, "type": market_type, "date": (today - timedelta(days=1)).isoformat(), "language": "en"},
-        ]
+        if last_payload:
+            index = self._build_price_index(last_payload)
+            if index:
+                self._cache[cache_key] = index
+                source = "poe.ninja"
+                if last_candidate.lower() != league_name.lower():
+                    source = f"poe.ninja ({last_candidate} fallback)"
+                return index, source
+        return None
 
     @staticmethod
     def _league_candidates(league_name: str) -> list[str]:
@@ -113,10 +101,22 @@ class StashMarketSource:
         return candidates
 
     @classmethod
-    def _build_price_index(cls, lines: list[dict[str, Any]]) -> dict[str, MarketPriceEntry]:
+    def _build_price_index(cls, payload: dict[str, Any]) -> dict[str, MarketPriceEntry]:
         index: dict[str, MarketPriceEntry] = {}
+        items = payload.get("items", [])
+        lines = payload.get("lines", [])
+        if not isinstance(items, list) or not isinstance(lines, list):
+            return index
+
+        items_by_id = {
+            str(item.get("id")): item
+            for item in items
+            if isinstance(item, dict) and item.get("id") is not None
+        }
         for line in lines:
-            item_name = cls._resolve_line_name(line)
+            if not isinstance(line, dict):
+                continue
+            item_name = cls._resolve_line_name(line, items_by_id)
             chaos_value = cls._extract_chaos_value(line)
             if not item_name or chaos_value in {None, Decimal("0")}:
                 continue
@@ -125,7 +125,14 @@ class StashMarketSource:
         return index
 
     @staticmethod
-    def _resolve_line_name(line: dict[str, Any]) -> str | None:
+    def _resolve_line_name(line: dict[str, Any], items_by_id: dict[str, dict[str, Any]]) -> str | None:
+        line_id = line.get("id")
+        if line_id is not None:
+            item = items_by_id.get(str(line_id))
+            if item:
+                value = item.get("name")
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
         for key in ("name", "currencyTypeName", "baseType", "detailsId"):
             value = line.get(key)
             if isinstance(value, str) and value.strip():
@@ -134,7 +141,7 @@ class StashMarketSource:
 
     @staticmethod
     def _extract_chaos_value(line: dict[str, Any]) -> Decimal | None:
-        for key in ("chaosValue", "chaosEquivalent"):
+        for key in ("primaryValue", "chaosValue", "chaosEquivalent"):
             value = line.get(key)
             if value is None:
                 continue
@@ -151,9 +158,9 @@ class StashMarketSource:
     @staticmethod
     def _stash_type_mappings() -> dict[str, tuple[tuple[str, str], ...]]:
         return {
-            "CurrencyStash": (("currencyoverview", "Currency"),),
-            "FragmentStash": (("currencyoverview", "Fragment"),),
-            "EssenceStash": (("itemoverview", "Essence"),),
-            "DivinationCardStash": (("itemoverview", "DivinationCard"),),
-            "MapStash": (("itemoverview", "Map"), ("itemoverview", "UniqueMap")),
+            "CurrencyStash": (("exchange", "Currency"),),
+            "FragmentStash": (("exchange", "Fragment"), ("exchange", "Scarab")),
+            "EssenceStash": (("exchange", "Essence"),),
+            "DivinationCardStash": (("exchange", "DivinationCard"),),
+            "MapStash": (("exchange", "Map"), ("exchange", "UniqueMap")),
         }
