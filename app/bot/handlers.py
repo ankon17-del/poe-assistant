@@ -876,6 +876,12 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
         "fr": "Open these tabs first",
         "de": "Open these tabs first",
     }.get(locale, "Open these tabs first")
+    account_context_label = {
+        "ru": "Account-aware контекст",
+        "en": "Account-aware context",
+        "fr": "Contexte orienté compte",
+        "de": "Account-aware-Kontext",
+    }.get(locale, "Account-aware context")
     category_labels = {
         "ru": {
             "currency": "Валюта",
@@ -915,6 +921,13 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
     for item in summary.statuses:
         lines.append(f"- {item.title}: {item.status}")
         lines.append(f"  {item.detail}")
+
+    account_notes = build_stash_account_notes(summary, locale)
+    if account_notes:
+        lines.append("")
+        lines.append(f"{account_context_label}:")
+        for note in account_notes:
+            lines.append(f"- {note}")
 
     if summary.live_snapshot:
         live = summary.live_snapshot
@@ -1075,6 +1088,94 @@ def build_stash_action_text(summary, slug: str, locale: str = DEFAULT_LOCALE) ->
     if slug == "currency":
         return build_stash_currency_text(summary, guide, locale)
     return build_stash_guide_text(guide, locale)
+
+
+def build_stash_account_notes(summary, locale: str = DEFAULT_LOCALE) -> tuple[str, ...]:
+    snapshot = getattr(summary, "account_snapshot", None)
+    live = getattr(summary, "live_snapshot", None)
+    if not snapshot:
+        return ()
+
+    notes: list[str] = []
+    poe1_focus = format_focus_summary(getattr(snapshot, "poe1_characters", ()))
+    poe2_focus = format_focus_summary(getattr(snapshot, "poe2_characters", ()))
+
+    if poe1_focus:
+        notes.append(
+            _localized_text(
+                locale,
+                {
+                    "ru": f"POE1-фокус: {poe1_focus}",
+                    "en": f"POE1 focus: {poe1_focus}",
+                    "fr": f"Focus POE1 : {poe1_focus}",
+                    "de": f"POE1-Fokus: {poe1_focus}",
+                },
+            )
+        )
+    if poe2_focus:
+        notes.append(
+            _localized_text(
+                locale,
+                {
+                    "ru": f"POE2-фокус: {poe2_focus}",
+                    "en": f"POE2 focus: {poe2_focus}",
+                    "fr": f"Focus POE2 : {poe2_focus}",
+                    "de": f"POE2-Fokus: {poe2_focus}",
+                },
+            )
+        )
+
+    if live and snapshot.poe1_primary_league and live.league_name == snapshot.poe1_primary_league:
+        notes.append(
+            _localized_text(
+                locale,
+                {
+                    "ru": f"Текущий stash-scan совпадает с основной PoE1-лигой аккаунта: {live.league_name}. Значит этот обзор максимально близок к твоему реальному банку.",
+                    "en": f"The current stash scan matches your main PoE1 league: {live.league_name}. This makes the overview closely aligned with your real stash bank.",
+                    "fr": f"Le scan actuel du coffre correspond à ta ligue PoE1 principale : {live.league_name}. L'aperçu est donc très proche de ton vrai coffre.",
+                    "de": f"Der aktuelle Stash-Scan entspricht deiner primären PoE1-Liga: {live.league_name}. Dadurch ist die Übersicht sehr nah an deinem echten Stash-Bankstand.",
+                },
+            )
+        )
+    elif live and snapshot.poe1_primary_league and live.league_name != snapshot.poe1_primary_league:
+        notes.append(
+            _localized_text(
+                locale,
+                {
+                    "ru": f"Сейчас тайник читается из лиги {live.league_name}, а основной PoE1-фокус аккаунта выглядит как {snapshot.poe1_primary_league}. Это стоит держать в голове при продаже и сортировке.",
+                    "en": f"The stash is currently read from {live.league_name}, while your main PoE1 focus looks like {snapshot.poe1_primary_league}. Keep that in mind when selling and sorting.",
+                    "fr": f"Le coffre est actuellement lu depuis {live.league_name}, alors que ton focus PoE1 principal semble être {snapshot.poe1_primary_league}. Garde-le en tête pour le tri et la vente.",
+                    "de": f"Der Stash wird aktuell aus {live.league_name} gelesen, während dein primärer PoE1-Fokus eher {snapshot.poe1_primary_league} ist. Behalte das beim Verkaufen und Sortieren im Blick.",
+                },
+            )
+        )
+
+    if snapshot.poe2_character_count > snapshot.poe1_character_count:
+        notes.append(
+            _localized_text(
+                locale,
+                {
+                    "ru": "На аккаунте сейчас сильнее виден POE2-цикл. Значит этот PoE1 stash лучше читать как support-банк: что можно быстро вытащить, продать или переложить под текущие цели.",
+                    "en": "Your account currently leans more toward a POE2 cycle. That means this PoE1 stash is best treated as a support bank for quick sales and transfers into your current goals.",
+                    "fr": "Ton compte penche actuellement davantage vers un cycle POE2. Ce coffre PoE1 doit donc être lu comme une banque de soutien pour vendre ou déplacer rapidement des ressources.",
+                    "de": "Dein Konto ist aktuell stärker in einem POE2-Zyklus. Dieser PoE1-Stash sollte daher eher als Support-Bank für schnelle Verkäufe und Umlagerungen gelesen werden.",
+                },
+            )
+        )
+    elif snapshot.poe1_character_count > snapshot.poe2_character_count:
+        notes.append(
+            _localized_text(
+                locale,
+                {
+                    "ru": "Сейчас аккаунт сильнее завязан на POE1. Значит sell-first, bulk-sale и разбор вкладок уже бьют в самый полезный для тебя контур.",
+                    "en": "Your account currently leans more toward POE1, so sell-first, bulk-sale, and stash cleanup are already hitting the most relevant loop.",
+                    "fr": "Ton compte penche actuellement davantage vers POE1, donc la logique sell-first, bulk-sale et tri du coffre agit déjà dans la boucle la plus utile.",
+                    "de": "Dein Konto ist aktuell stärker auf POE1 ausgerichtet, daher treffen Sell-first, Bulk-Sale und Stash-Aufräumen bereits den nützlichsten Loop.",
+                },
+            )
+        )
+
+    return tuple(notes[:4])
 
 
 def build_stash_triage_text(summary, guide, locale: str = DEFAULT_LOCALE) -> str:

@@ -12,7 +12,7 @@ from app.integrations.tracking_source import TrackingRequest
 from app.models.enums import IntegrationType
 from app.models.user import User
 from app.services.integrations import IntegrationService
-from app.services.poe_account import PoeAccountApiService, PoeAccountError, StashSnapshot
+from app.services.poe_account import AccountSnapshot, PoeAccountApiService, PoeAccountError, StashSnapshot
 
 
 @dataclass(frozen=True)
@@ -34,6 +34,7 @@ class StashGuide:
 class StashPanelSummary:
     account_connected: bool
     account_name: str | None
+    account_snapshot: AccountSnapshot | None
     oauth_available: bool
     oauth_blocker: str | None
     approved_scopes: tuple[str, ...]
@@ -219,6 +220,7 @@ class StashService:
 
         scopes = tuple(scope.strip() for scope in (integration.scopes or "").split() if scope.strip()) if integration else ()
         stash_scopes_ready = "account:stashes" in scopes
+        account_snapshot: AccountSnapshot | None = None
 
         live_snapshot: StashSnapshot | None = None
         live_error: str | None = None
@@ -227,6 +229,13 @@ class StashService:
         tab_totals: tuple[StashTabTotal, ...] = ()
         valuation_source: str | None = None
         estimated_liquid_chaos: float | None = None
+        if include_live and integration:
+            poe_account_service = PoeAccountApiService(self.session)
+            try:
+                account_snapshot = await poe_account_service.get_account_snapshot(user)
+            except PoeAccountError:
+                account_snapshot = None
+
         if include_live and integration and stash_scopes_ready:
             try:
                 live_snapshot = await PoeAccountApiService(self.session).get_stash_snapshot(user)
@@ -301,6 +310,7 @@ class StashService:
         return StashPanelSummary(
             account_connected=integration is not None,
             account_name=integration.external_account_name if integration else None,
+            account_snapshot=account_snapshot,
             oauth_available=oauth_available,
             oauth_blocker=oauth_blocker,
             approved_scopes=scopes,

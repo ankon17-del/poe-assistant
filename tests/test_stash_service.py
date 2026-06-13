@@ -1,9 +1,9 @@
 import asyncio
 from decimal import Decimal
 
-from app.bot.handlers import build_stash_action_text
+from app.bot.handlers import build_stash_action_text, build_stash_text
 from app.integrations.stash_market_source import MarketPriceEntry
-from app.services.poe_account import StashItemSummary, StashSnapshot, StashTabOverview
+from app.services.poe_account import AccountSnapshot, CharacterSummary, StashItemSummary, StashSnapshot, StashTabOverview
 from app.services.stash import (
     PricedStashCandidate,
     StashCapabilityStatus,
@@ -205,6 +205,7 @@ def test_build_stash_action_text_for_liquid_uses_live_candidates() -> None:
     summary = StashPanelSummary(
         account_connected=True,
         account_name="Xa1ha#6754",
+        account_snapshot=None,
         oauth_available=True,
         oauth_blocker=None,
         approved_scopes=("account:stashes",),
@@ -289,6 +290,7 @@ def test_build_stash_action_text_for_triage_uses_live_tabs() -> None:
     summary = StashPanelSummary(
         account_connected=True,
         account_name="Xa1ha#6754",
+        account_snapshot=None,
         oauth_available=True,
         oauth_blocker=None,
         approved_scopes=("account:stashes",),
@@ -310,3 +312,57 @@ def test_build_stash_action_text_for_triage_uses_live_tabs() -> None:
     assert "Топ вкладки по value:" in text
     assert "Где вероятен разбор:" in text
     assert "Fragments (fragments)" in text or "Fragments (fragment" in text
+
+
+def test_build_stash_text_includes_account_aware_context() -> None:
+    summary = StashPanelSummary(
+        account_connected=True,
+        account_name="Xa1ha#6754",
+        account_snapshot=AccountSnapshot(
+            account_name="Xa1ha#6754",
+            profile_name="Xa1ha#6754",
+            poe1_leagues=("Mirage", "Standard"),
+            poe1_primary_league="Mirage",
+            poe1_character_count=3,
+            poe2_character_count=6,
+            poe1_characters=(
+                CharacterSummary(name="BosserAmy", league="Mirage", level=97, class_name="Pathfinder"),
+            ),
+            poe2_characters=(
+                CharacterSummary(name="RunesMage", league="Aldur Runes", level=88, class_name="Sorceress"),
+            ),
+            poe1_stash_note=None,
+        ),
+        oauth_available=True,
+        oauth_blocker=None,
+        approved_scopes=("account:stashes",),
+        stash_scopes_ready=True,
+        live_snapshot=StashSnapshot(
+            league_name="Mirage",
+            total_tabs=1,
+            folder_tabs=0,
+            special_tabs=1,
+            empty_tabs=0,
+            total_items=10,
+            sample_tabs=("Currency",),
+            liquid_tabs=(),
+            dense_tabs=(),
+            dump_tabs=(),
+            tabs=(),
+        ),
+        live_error=None,
+        priced_candidates=(),
+        category_totals=(),
+        tab_totals=(),
+        valuation_source=None,
+        estimated_liquid_chaos=None,
+        statuses=(StashCapabilityStatus(title="ok", status="ok", detail="ok"),),
+        next_steps=("next",),
+    )
+
+    text = build_stash_text(summary, "ru")
+
+    assert "Account-aware контекст:" in text
+    assert "POE1-фокус: Mirage (BosserAmy lvl 97 Pathfinder)" in text
+    assert "POE2-фокус: Aldur Runes (RunesMage lvl 88 Sorceress)" in text
+    assert "Текущий stash-scan совпадает с основной PoE1-лигой аккаунта: Mirage." in text
