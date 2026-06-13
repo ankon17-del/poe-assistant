@@ -93,6 +93,16 @@ def format_decimal(value: Decimal) -> str:
     return text or "0"
 
 
+def format_market_value(value: Decimal) -> str:
+    if value >= Decimal("1000"):
+        quantized = value.quantize(Decimal("1"))
+    elif value >= Decimal("100"):
+        quantized = value.quantize(Decimal("0.1"))
+    else:
+        quantized = value.quantize(Decimal("0.01"))
+    return format_decimal(quantized)
+
+
 def build_tracking_lines(item) -> list[str]:
     league_name = item.league.name if item.league else "Без лиги"
     game_label = "POE 2" if item.league and item.league.realm == "poe2" else "POE 1"
@@ -430,6 +440,18 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
         },
     }
     trm = copy.get(locale, copy["en"])
+    liquid_estimate_label = {
+        "ru": "Видимая ликвидность",
+        "en": "Visible liquid estimate",
+        "fr": "Liquidite visible estimee",
+        "de": "Sichtbare Liquiditaet",
+    }.get(locale, trm.get("liquid_estimate", "Visible liquid estimate"))
+    per_each_label = {
+        "ru": "за штуку",
+        "en": "each",
+        "fr": "par unite",
+        "de": "pro Stueck",
+    }.get(locale, "each")
     lines = [trm["title"], ""]
 
     if summary.account_connected:
@@ -475,15 +497,15 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
         if summary.priced_candidates:
             lines.append("")
             if summary.estimated_liquid_chaos is not None:
-                liquid_text = format_decimal(Decimal(str(summary.estimated_liquid_chaos)))
-                lines.append(f"{trm.get('liquid_estimate', 'Visible liquid estimate')}: ~ {liquid_text} chaos")
+                liquid_text = format_market_value(Decimal(str(summary.estimated_liquid_chaos)))
+                lines.append(f"{liquid_estimate_label}: ~ {liquid_text} chaos")
                 lines.append("")
             lines.append(f"{trm['sell']}:")
             for candidate in summary.priced_candidates[:6]:
-                unit_text = format_decimal(Decimal(str(candidate.unit_price_chaos)))
-                total_text = format_decimal(Decimal(str(candidate.total_price_chaos)))
+                unit_text = format_market_value(Decimal(str(candidate.unit_price_chaos)))
+                total_text = format_market_value(Decimal(str(candidate.total_price_chaos)))
                 lines.append(
-                    f"- {candidate.item_name} x{candidate.quantity} [{candidate.tab_name}] ~ {total_text} chaos ({unit_text}c/ea)"
+                    f"- {candidate.item_name} x{candidate.quantity} [{candidate.tab_name}] ~ {total_text} chaos ({unit_text}c/{per_each_label})"
                 )
             if summary.valuation_source:
                 lines.append(f"- {trm['source']}: {summary.valuation_source}")
