@@ -222,6 +222,9 @@ def build_account_text(*, integration, oauth_config_error: str | None, locale: s
             lines.append(f"{trm['poe1_main']}: {snapshot.poe1_primary_league}")
         lines.append(f"{trm['poe1_chars']}: {snapshot.poe1_character_count}")
         lines.append(f"{trm['poe2_chars']}: {snapshot.poe2_character_count}")
+        if getattr(snapshot, "poe1_stash_note", None):
+            lines.append("")
+            lines.append(snapshot.poe1_stash_note)
 
     if oauth_config_error:
         lines.append("")

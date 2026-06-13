@@ -38,6 +38,7 @@ class AccountSnapshot:
     poe1_primary_league: str | None
     poe1_character_count: int
     poe2_character_count: int
+    poe1_stash_note: str | None
 
 
 @dataclass(frozen=True)
@@ -76,6 +77,7 @@ class PoeAccountApiService:
             poe1_primary_league=self.choose_primary_poe1_league(poe1_leagues, self.settings.default_league_name),
             poe1_character_count=len(poe1_characters_payload.get("characters", [])),
             poe2_character_count=len(poe2_characters_payload.get("characters", [])),
+            poe1_stash_note="PoE1 stash is selected from PoE1 account leagues only. PoE2 leagues are not used for this stash view yet.",
         )
 
     async def get_stash_snapshot(self, user: User, league_name: str | None = None) -> StashSnapshot:
@@ -212,6 +214,7 @@ class PoeAccountApiService:
             and "hardcore" not in league.lower()
             and "ssf" not in league.lower()
             and "solo self-found" not in league.lower()
+            and "ruthless" not in league.lower()
         ]
         if preferred_non_standard:
             return preferred_non_standard[0]
@@ -219,5 +222,16 @@ class PoeAccountApiService:
         for league in leagues:
             if league.lower() == "standard":
                 return league
+
+        softcore_non_ruthless = [
+            league
+            for league in leagues
+            if "hardcore" not in league.lower()
+            and "ssf" not in league.lower()
+            and "solo self-found" not in league.lower()
+            and "ruthless" not in league.lower()
+        ]
+        if softcore_non_ruthless:
+            return softcore_non_ruthless[0]
 
         return leagues[0]
