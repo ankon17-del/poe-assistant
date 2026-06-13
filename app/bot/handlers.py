@@ -347,6 +347,60 @@ def build_dead_currency_notes(summary, locale: str = DEFAULT_LOCALE) -> tuple[st
     return tuple(notes)
 
 
+def build_tab_sell_plan(summary, locale: str = DEFAULT_LOCALE) -> tuple[str, ...]:
+    if not summary.tab_totals:
+        return ()
+
+    tab_candidates: dict[str, list] = {}
+    for candidate in summary.priced_candidates:
+        tab_candidates.setdefault(candidate.tab_name, []).append(candidate)
+
+    copy = {
+        "ru": {
+            "bulk": "Шаг {index}: открой {tab_name}. Начни с {item_name} x{quantity} (~ {total} chaos) и попробуй продать вкладку как быстрый bulk-слой.",
+            "check": "Шаг {index}: открой {tab_name}. Там главный ориентир сейчас {item_name} (~ {total} chaos суммарно по позиции).",
+            "empty": "Шаг {index}: после этого проверь {tab_name}. Там есть value, но сначала имеет смысл снять самые ликвидные вкладки выше.",
+        },
+        "en": {
+            "bulk": "Step {index}: open {tab_name}. Start with {item_name} x{quantity} (~ {total} chaos) and try to sell that tab as a fast bulk layer.",
+            "check": "Step {index}: open {tab_name}. The main anchor there is {item_name} (~ {total} chaos total for that position).",
+            "empty": "Step {index}: then check {tab_name}. There is value there, but it makes more sense to clear the more liquid tabs first.",
+        },
+    }
+    localized = copy.get(locale, copy["en"])
+
+    notes: list[str] = []
+    for index, tab_total in enumerate(summary.tab_totals[:3], start=1):
+        candidates = tab_candidates.get(tab_total.tab_name, [])
+        top_candidate = candidates[0] if candidates else None
+        if top_candidate is None:
+            notes.append(localized["empty"].format(index=index, tab_name=tab_total.tab_name))
+            continue
+
+        total_text = format_market_value(top_candidate.total_price_chaos)
+        if top_candidate.quantity >= 3 and top_candidate.total_price_chaos >= 100:
+            notes.append(
+                localized["bulk"].format(
+                    index=index,
+                    tab_name=tab_total.tab_name,
+                    item_name=top_candidate.item_name,
+                    quantity=top_candidate.quantity,
+                    total=total_text,
+                )
+            )
+        else:
+            notes.append(
+                localized["check"].format(
+                    index=index,
+                    tab_name=tab_total.tab_name,
+                    item_name=top_candidate.item_name,
+                    total=total_text,
+                )
+            )
+
+    return tuple(notes)
+
+
 def build_tracking_lines(item) -> list[str]:
     league_name = item.league.name if item.league else "Без лиги"
     game_label = "POE 2" if item.league and item.league.realm == "poe2" else "POE 1"
@@ -876,6 +930,12 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
         "fr": "Open these tabs first",
         "de": "Open these tabs first",
     }.get(locale, "Open these tabs first")
+    sell_plan_label = {
+        "ru": "Маршрут по вкладкам",
+        "en": "Tab-by-tab sell plan",
+        "fr": "Plan de vente par onglet",
+        "de": "Verkaufsplan pro Tab",
+    }.get(locale, "Tab-by-tab sell plan")
     account_context_label = {
         "ru": "Account-aware контекст",
         "en": "Account-aware context",
@@ -993,6 +1053,12 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
                 if fast_cash_notes:
                     lines.append(f"{fast_cash_label}:")
                     for note in fast_cash_notes:
+                        lines.append(f"- {note}")
+                    lines.append("")
+                tab_sell_plan = build_tab_sell_plan(summary, locale)
+                if tab_sell_plan:
+                    lines.append(f"{sell_plan_label}:")
+                    for note in tab_sell_plan:
                         lines.append(f"- {note}")
                     lines.append("")
                 bulk_sale_notes = build_bulk_sale_notes(summary, locale)
@@ -1210,12 +1276,17 @@ def build_stash_triage_text(summary, guide, locale: str = DEFAULT_LOCALE) -> str
                 lines.append(
                     f"- {tab_total.tab_name} ({stash_tab_type_label(tab_total.tab_type, locale).lower()}) ~ {format_market_value(tab_total.total_price_chaos)}"
                 )
+            tab_sell_plan = build_tab_sell_plan(summary, locale)
+            if tab_sell_plan:
+                lines.append("")
+                lines.append(_localized_text(locale, {"ru": "Куда идти по порядку:", "en": "Best route right now:", "fr": "Meilleur ordre maintenant :", "de": "Beste Reihenfolge gerade jetzt:"}))
+                lines.extend(f"- {note}" for note in tab_sell_plan)
 
         if live.dump_tabs:
             lines.append("")
             lines.append(_localized_text(locale, {"ru": "Где вероятен разбор:", "en": "Likely cleanup tabs:", "fr": "Où un tri est probable :", "de": "Wahrscheinliche Aufräum-Tabs:"}))
             for tab in live.dump_tabs[:3]:
-                lines.append(f"- {_build_stash_tab_line(tab)}")
+                lines.append(_build_stash_tab_line(tab))
 
     _append_stash_live_footer(lines, summary, locale)
     return "\n".join(lines)
@@ -1273,13 +1344,13 @@ def build_stash_uniques_text(summary, guide, locale: str = DEFAULT_LOCALE) -> st
             lines.append("")
             lines.append(_localized_text(locale, {"ru": "Unique-вкладки, которые стоит открыть:", "en": "Unique tabs worth opening:", "fr": "Onglets uniques à ouvrir :", "de": "Unique-Tabs, die du öffnen solltest:"}))
             for tab in unique_tabs[:3]:
-                lines.append(f"- {_build_stash_tab_line(tab)}")
+                lines.append(_build_stash_tab_line(tab))
         dense_normals = [tab for tab in live.dense_tabs if tab.type in {"NormalStash", "PremiumStash", "QuadStash"}]
         if dense_normals:
             lines.append("")
             lines.append(_localized_text(locale, {"ru": "Обычные вкладки, где могут прятаться уникалки:", "en": "Normal tabs that may hide uniques:", "fr": "Onglets normaux pouvant cacher des uniques :", "de": "Normale Tabs, in denen sich Uniques verstecken können:"}))
             for tab in dense_normals[:3]:
-                lines.append(f"- {_build_stash_tab_line(tab)}")
+                lines.append(_build_stash_tab_line(tab))
     _append_stash_live_footer(lines, summary, locale)
     return "\n".join(lines)
 

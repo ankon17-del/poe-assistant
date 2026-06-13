@@ -310,7 +310,10 @@ def test_build_stash_action_text_for_triage_uses_live_tabs() -> None:
 
     assert "Что делать прямо сейчас:" in text
     assert "Топ вкладки по value:" in text
+    assert "Куда идти по порядку:" in text
+    assert "Шаг 1: после этого проверь Fragments." in text
     assert "Где вероятен разбор:" in text
+    assert "- Dump: 80" in text
     assert "Fragments (fragments)" in text or "Fragments (fragment" in text
 
 
@@ -351,11 +354,23 @@ def test_build_stash_text_includes_account_aware_context() -> None:
             tabs=(),
         ),
         live_error=None,
-        priced_candidates=(),
+        priced_candidates=(
+            PricedStashCandidate(
+                tab_name="Currency",
+                tab_type="CurrencyStash",
+                category_key="currency",
+                item_name="Divine Orb",
+                quantity=3,
+                unit_price_chaos=587.2,
+                total_price_chaos=1762.0,
+            ),
+        ),
         category_totals=(),
-        tab_totals=(),
+        tab_totals=(
+            StashTabTotal(tab_name="Currency", tab_type="CurrencyStash", total_price_chaos=3551.0),
+        ),
         valuation_source=None,
-        estimated_liquid_chaos=None,
+        estimated_liquid_chaos=3551.0,
         statuses=(StashCapabilityStatus(title="ok", status="ok", detail="ok"),),
         next_steps=("next",),
     )
@@ -366,3 +381,5 @@ def test_build_stash_text_includes_account_aware_context() -> None:
     assert "POE1-фокус: Mirage (BosserAmy lvl 97 Pathfinder)" in text
     assert "POE2-фокус: Aldur Runes (RunesMage lvl 88 Sorceress)" in text
     assert "Текущий stash-scan совпадает с основной PoE1-лигой аккаунта: Mirage." in text
+    assert "Маршрут по вкладкам:" in text
+    assert "Шаг 1: открой Currency." in text
