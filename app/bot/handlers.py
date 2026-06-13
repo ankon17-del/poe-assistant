@@ -262,6 +262,89 @@ def build_bulk_sale_notes(summary, locale: str = DEFAULT_LOCALE) -> tuple[str, .
     return tuple(notes)
 
 
+def build_wealth_summary_notes(summary, locale: str = DEFAULT_LOCALE) -> tuple[str, ...]:
+    if summary.estimated_liquid_chaos is None or not summary.category_totals:
+        return ()
+
+    total = Decimal(str(summary.estimated_liquid_chaos))
+    if total <= 0:
+        return ()
+
+    copy = {
+        "ru": {
+            "dominant": "Основная масса видимой ликвидности сейчас в категории {category}: около {share}% от stash value.",
+            "split": "Ядро wealth сейчас собрано вокруг {first} и {second}: вместе это около {share}% видимой стоимости.",
+            "small": "Остальные категории пока заметно меньше и скорее идут как дополнительная ликвидность, а не как core wealth.",
+        },
+        "en": {
+            "dominant": "Most visible liquidity is currently in {category}: around {share}% of stash value.",
+            "split": "Your wealth core is currently concentrated in {first} and {second}: together about {share}% of visible value.",
+            "small": "The remaining categories are much smaller for now and behave more like side liquidity than core wealth.",
+        },
+    }
+    localized = copy.get(locale, copy["en"])
+
+    rows = sorted(summary.category_totals, key=lambda item: item.total_price_chaos, reverse=True)
+    top = rows[0]
+    top_share = int(round((Decimal(str(top.total_price_chaos)) / total) * 100))
+    notes = [
+        localized["dominant"].format(
+            category=stash_category_label(top.category_key, locale).lower(),
+            share=top_share,
+        )
+    ]
+
+    if len(rows) >= 2:
+        second = rows[1]
+        combined_share = int(
+            round(((Decimal(str(top.total_price_chaos)) + Decimal(str(second.total_price_chaos))) / total) * 100)
+        )
+        notes.append(
+            localized["split"].format(
+                first=stash_category_label(top.category_key, locale).lower(),
+                second=stash_category_label(second.category_key, locale).lower(),
+                share=combined_share,
+            )
+        )
+
+    if len(rows) >= 3:
+        notes.append(localized["small"])
+
+    return tuple(notes)
+
+
+def build_dead_currency_notes(summary, locale: str = DEFAULT_LOCALE) -> tuple[str, ...]:
+    candidates = [
+        candidate
+        for candidate in summary.priced_candidates
+        if candidate.category_key in {"currency", "fragments", "essences"}
+        and candidate.quantity >= 10
+        and candidate.unit_price_chaos <= 20
+        and candidate.total_price_chaos >= 120
+    ]
+    if not candidates:
+        return ()
+
+    copy = {
+        "ru": "{item_name} x{quantity} из {tab_name} ~= {total} chaos. Это похоже на мертвую ликвидность: можно быстро слить bulk-пачкой.",
+        "en": "{item_name} x{quantity} from {tab_name} ~= {total} chaos. This looks like dead liquidity and can likely be bulk-sold fast.",
+    }
+    template = copy.get(locale, copy["en"])
+
+    notes: list[str] = []
+    for candidate in candidates[:3]:
+        total_text = format_market_value(Decimal(str(candidate.total_price_chaos)))
+        notes.append(
+            template.format(
+                item_name=candidate.item_name,
+                quantity=candidate.quantity,
+                tab_name=candidate.tab_name,
+                total=total_text,
+            )
+        )
+    return tuple(notes)
+
+
 def build_tracking_lines(item) -> list[str]:
     league_name = item.league.name if item.league else "Без лиги"
     game_label = "POE 2" if item.league and item.league.realm == "poe2" else "POE 1"
@@ -635,6 +718,24 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
         "fr": "Quick bulk-sale ideas",
         "de": "Quick bulk-sale ideas",
     }.get(locale, "Quick bulk-sale ideas")
+    wealth_snapshot_label = {
+        "ru": "Wealth snapshot",
+        "en": "Wealth snapshot",
+        "fr": "Wealth snapshot",
+        "de": "Wealth snapshot",
+    }.get(locale, "Wealth snapshot")
+    wealth_summary_label = {
+        "ru": "Короткий вывод по wealth",
+        "en": "Wealth summary",
+        "fr": "Wealth summary",
+        "de": "Wealth summary",
+    }.get(locale, "Wealth summary")
+    dead_currency_label = {
+        "ru": "Мертвая ликвидность",
+        "en": "Dead liquidity",
+        "fr": "Dead liquidity",
+        "de": "Dead liquidity",
+    }.get(locale, "Dead liquidity")
     quick_open_label = {
         "ru": "Что открыть прямо сейчас",
         "en": "Open these tabs first",
@@ -706,7 +807,14 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             lines.append("")
             if summary.estimated_liquid_chaos is not None:
                 liquid_text = format_market_value(Decimal(str(summary.estimated_liquid_chaos)))
+                lines.append(f"{wealth_snapshot_label}:")
                 lines.append(f"{liquid_estimate_label}: ~ {liquid_text} chaos")
+                lines.append("")
+            wealth_summary_notes = build_wealth_summary_notes(summary, locale)
+            if wealth_summary_notes:
+                lines.append(f"{wealth_summary_label}:")
+                for note in wealth_summary_notes:
+                    lines.append(f"- {note}")
                 lines.append("")
             if summary.category_totals:
                 lines.append(f"{category_breakdown_label}:")
@@ -717,6 +825,12 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
                         stash_category_label(category.category_key, locale),
                     )
                     lines.append(f"- {category_name} ~ {total_text} chaos")
+                lines.append("")
+            dead_currency_notes = build_dead_currency_notes(summary, locale)
+            if dead_currency_notes:
+                lines.append(f"{dead_currency_label}:")
+                for note in dead_currency_notes:
+                    lines.append(f"- {note}")
                 lines.append("")
             if summary.tab_totals:
                 lines.append(f"{quick_open_label}:")
