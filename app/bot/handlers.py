@@ -93,7 +93,9 @@ def format_decimal(value: Decimal) -> str:
     return text or "0"
 
 
-def format_market_value(value: Decimal) -> str:
+def format_market_value(value: Decimal | float | int) -> str:
+    if not isinstance(value, Decimal):
+        value = Decimal(str(value))
     if value >= Decimal("1000"):
         quantized = value.quantize(Decimal("1"))
     elif value >= Decimal("100"):
@@ -1059,6 +1061,203 @@ def build_stash_guide_text(guide, locale: str = DEFAULT_LOCALE) -> str:
     return "\n".join(lines)
 
 
+def build_stash_action_text(summary, slug: str, locale: str = DEFAULT_LOCALE) -> str:
+    guide = StashService.get_guide(slug)
+    if guide is None:
+        return ""
+
+    if slug == "triage":
+        return build_stash_triage_text(summary, guide, locale)
+    if slug == "liquid":
+        return build_stash_liquidation_text(summary, guide, locale)
+    if slug == "uniques":
+        return build_stash_uniques_text(summary, guide, locale)
+    if slug == "currency":
+        return build_stash_currency_text(summary, guide, locale)
+    return build_stash_guide_text(guide, locale)
+
+
+def build_stash_triage_text(summary, guide, locale: str = DEFAULT_LOCALE) -> str:
+    live = getattr(summary, "live_snapshot", None)
+    lines = [f"Stash assistant · {guide.title}", "", guide.summary]
+    if live:
+        lines.extend(
+            [
+                "",
+                _localized_text(
+                    locale,
+                    {
+                        "ru": f"Лига: {live.league_name} · вкладок: {live.total_tabs} · предметов в просмотренных вкладках: {live.total_items}",
+                        "en": f"League: {live.league_name} · tabs: {live.total_tabs} · items in scanned tabs: {live.total_items}",
+                        "fr": f"Ligue : {live.league_name} · onglets : {live.total_tabs} · objets analysés : {live.total_items}",
+                        "de": f"Liga: {live.league_name} · Tabs: {live.total_tabs} · gescannte Gegenstände: {live.total_items}",
+                    },
+                )
+            ]
+        )
+
+        takeaways = _build_stash_takeaways(live, locale)
+        if takeaways:
+            lines.append("")
+            lines.append(_localized_text(locale, {"ru": "Что делать прямо сейчас:", "en": "What to do right now:", "fr": "À faire maintenant :", "de": "Was du jetzt tun solltest:"}))
+            lines.extend(f"- {note}" for note in takeaways[:3])
+
+        if summary.tab_totals:
+            lines.append("")
+            lines.append(_localized_text(locale, {"ru": "Топ вкладки по value:", "en": "Top tabs by value:", "fr": "Meilleurs onglets par valeur :", "de": "Top-Tabs nach Wert:"}))
+            for tab_total in summary.tab_totals[:3]:
+                lines.append(
+                    f"- {tab_total.tab_name} ({stash_tab_type_label(tab_total.tab_type, locale).lower()}) ~ {format_market_value(tab_total.total_price_chaos)}"
+                )
+
+        if live.dump_tabs:
+            lines.append("")
+            lines.append(_localized_text(locale, {"ru": "Где вероятен разбор:", "en": "Likely cleanup tabs:", "fr": "Où un tri est probable :", "de": "Wahrscheinliche Aufräum-Tabs:"}))
+            for tab in live.dump_tabs[:3]:
+                lines.append(f"- {_build_stash_tab_line(tab)}")
+
+    _append_stash_live_footer(lines, summary, locale)
+    return "\n".join(lines)
+
+
+def build_stash_liquidation_text(summary, guide, locale: str = DEFAULT_LOCALE) -> str:
+    lines = [f"Stash assistant · {guide.title}", "", guide.summary]
+    if summary.estimated_liquid_chaos is not None:
+        lines.append("")
+        lines.append(
+            _localized_text(
+                locale,
+                {
+                    "ru": f"Видимая ликвидность сейчас: ~ {format_market_value(summary.estimated_liquid_chaos)}",
+                    "en": f"Visible liquid value right now: ~ {format_market_value(summary.estimated_liquid_chaos)}",
+                    "fr": f"Liquidité visible actuelle : ~ {format_market_value(summary.estimated_liquid_chaos)}",
+                    "de": f"Sichtbare Liquidität aktuell: ~ {format_market_value(summary.estimated_liquid_chaos)}",
+                },
+            )
+        )
+    if summary.priced_candidates:
+        lines.append("")
+        lines.append(_localized_text(locale, {"ru": "Что можно выставить первым:", "en": "Best first sale candidates:", "fr": "À vendre en premier :", "de": "Was du zuerst verkaufen kannst:"}))
+        for candidate in summary.priced_candidates[:5]:
+            lines.append(
+                f"- {candidate.item_name} x{candidate.quantity} [{candidate.tab_name}] ~ {format_market_value(candidate.total_price_chaos)} ({format_market_value(candidate.unit_price_chaos)}/{_localized_text(locale, {'ru': 'шт', 'en': 'ea', 'fr': 'u', 'de': 'Stk'})})"
+            )
+    if summary.category_totals:
+        lines.append("")
+        lines.append(_localized_text(locale, {"ru": "Где лежит основная ликвидность:", "en": "Where most liquid value sits:", "fr": "Où se trouve l'essentiel de la liquidité :", "de": "Wo der meiste liquide Wert liegt:"}))
+        for category in summary.category_totals[:4]:
+            lines.append(f"- {stash_category_label(category.category_key, locale)} ~ {format_market_value(category.total_price_chaos)}")
+    _append_stash_live_footer(lines, summary, locale)
+    return "\n".join(lines)
+
+
+def build_stash_uniques_text(summary, guide, locale: str = DEFAULT_LOCALE) -> str:
+    live = getattr(summary, "live_snapshot", None)
+    lines = [f"Stash assistant · {guide.title}", "", guide.summary]
+    lines.append("")
+    lines.append(
+        _localized_text(
+            locale,
+            {
+                "ru": "Важно: unique value пока не оценивается автоматически так же надежно, как currency / fragments / essences / div cards.",
+                "en": "Important: unique value is not auto-priced as reliably yet as currency, fragments, essences, or div cards.",
+                "fr": "Important : la valeur des uniques n'est pas encore estimée aussi fiablement que la monnaie, les fragments, les essences ou les cartes divinatoires.",
+                "de": "Wichtig: Unique-Werte werden aktuell noch nicht so zuverlässig automatisch bewertet wie Währung, Fragmente, Essenzen oder Div Cards.",
+            },
+        )
+    )
+    if live:
+        unique_tabs = [tab for tab in live.tabs if tab.type == "UniqueStash"]
+        if unique_tabs:
+            lines.append("")
+            lines.append(_localized_text(locale, {"ru": "Unique-вкладки, которые стоит открыть:", "en": "Unique tabs worth opening:", "fr": "Onglets uniques à ouvrir :", "de": "Unique-Tabs, die du öffnen solltest:"}))
+            for tab in unique_tabs[:3]:
+                lines.append(f"- {_build_stash_tab_line(tab)}")
+        dense_normals = [tab for tab in live.dense_tabs if tab.type in {"NormalStash", "PremiumStash", "QuadStash"}]
+        if dense_normals:
+            lines.append("")
+            lines.append(_localized_text(locale, {"ru": "Обычные вкладки, где могут прятаться уникалки:", "en": "Normal tabs that may hide uniques:", "fr": "Onglets normaux pouvant cacher des uniques :", "de": "Normale Tabs, in denen sich Uniques verstecken können:"}))
+            for tab in dense_normals[:3]:
+                lines.append(f"- {_build_stash_tab_line(tab)}")
+    _append_stash_live_footer(lines, summary, locale)
+    return "\n".join(lines)
+
+
+def build_stash_currency_text(summary, guide, locale: str = DEFAULT_LOCALE) -> str:
+    lines = [f"Stash assistant · {guide.title}", "", guide.summary]
+    preferred_categories = {"currency", "fragments", "essences", "div_cards"}
+    preferred_tab_types = {"CurrencyStash", "FragmentStash", "EssenceStash", "DivinationCardStash"}
+    category_rows = [row for row in summary.category_totals if row.category_key in preferred_categories]
+    tab_rows = [row for row in summary.tab_totals if row.tab_type in preferred_tab_types]
+    candidate_rows = [row for row in summary.priced_candidates if row.category_key in preferred_categories]
+
+    if category_rows:
+        lines.append("")
+        lines.append(_localized_text(locale, {"ru": "Где лежит bulk-value:", "en": "Where the bulk value sits:", "fr": "Où se trouve la valeur bulk :", "de": "Wo der Bulk-Wert liegt:"}))
+        for row in category_rows[:4]:
+            lines.append(f"- {stash_category_label(row.category_key, locale)} ~ {format_market_value(row.total_price_chaos)}")
+
+    if tab_rows:
+        lines.append("")
+        lines.append(_localized_text(locale, {"ru": "Какие вкладки открыть первыми:", "en": "Tabs to open first:", "fr": "Onglets à ouvrir en premier :", "de": "Welche Tabs du zuerst öffnen solltest:"}))
+        for row in tab_rows[:4]:
+            lines.append(f"- {row.tab_name} ({stash_tab_type_label(row.tab_type, locale).lower()}) ~ {format_market_value(row.total_price_chaos)}")
+
+    if candidate_rows:
+        lines.append("")
+        lines.append(_localized_text(locale, {"ru": "Конкретные bulk-позиции:", "en": "Concrete bulk positions:", "fr": "Positions bulk concrètes :", "de": "Konkrete Bulk-Positionen:"}))
+        for row in candidate_rows[:5]:
+            lines.append(f"- {row.item_name} x{row.quantity} [{row.tab_name}] ~ {format_market_value(row.total_price_chaos)}")
+
+    _append_stash_live_footer(lines, summary, locale)
+    return "\n".join(lines)
+
+
+def _append_stash_live_footer(lines: list[str], summary, locale: str) -> None:
+    lines.append("")
+    if summary.live_snapshot:
+        source_line = None
+        if summary.valuation_source:
+            source_line = _localized_text(
+                locale,
+                {
+                    "ru": f"Источник оценки: {summary.valuation_source}",
+                    "en": f"Pricing source: {summary.valuation_source}",
+                    "fr": f"Source d'estimation : {summary.valuation_source}",
+                    "de": f"Preisquelle: {summary.valuation_source}",
+                },
+            )
+        footer = _localized_text(
+            locale,
+            {
+                "ru": "Это уже live-слой по твоему текущему тайнику, а не общий ручной playbook.",
+                "en": "This is now a live layer based on your current stash, not just a generic manual playbook.",
+                "fr": "Ceci repose déjà sur ton coffre actuel, pas seulement sur un playbook manuel générique.",
+                "de": "Das ist bereits eine Live-Schicht auf Basis deines aktuellen Stashes und nicht nur ein allgemeines Playbook.",
+            },
+        )
+        if source_line:
+            lines.append(source_line)
+        lines.append(footer)
+        return
+
+    lines.append(
+        _localized_text(
+            locale,
+            {
+                "ru": "Live stash-данные пока недоступны, поэтому здесь показан безопасный fallback без персональной оценки рынка.",
+                "en": "Live stash data is unavailable right now, so this view is using a safe fallback without personal market valuation.",
+                "fr": "Les données live du coffre sont indisponibles pour le moment, donc cette vue utilise un fallback sûr sans estimation personnalisée du marché.",
+                "de": "Live-Stash-Daten sind gerade nicht verfügbar, daher nutzt diese Ansicht einen sicheren Fallback ohne persönliche Marktbewertung.",
+            },
+        )
+    )
+
+
+def _localized_text(locale: str, values: dict[str, str]) -> str:
+    return values.get(locale, values.get("en", ""))
+
+
 def build_template_preview_text(template, game: str) -> str:
     game_label = "POE 2" if game == "poe2" else "POE 1"
     lines = [f"Шаблон: {template.name}", f"Игра: {game_label}"]
@@ -1733,6 +1932,44 @@ async def load_stash_panel_with_fallback(
     except asyncio.TimeoutError:
         text, keyboard = await load_stash_panel(telegram_id, username, telegram_locale, include_live=False)
         return f"{stash_loading_timeout_text(locale)}\n\n{text}", keyboard
+
+
+async def load_stash_guide_panel(
+    telegram_id: int,
+    username: str | None,
+    slug: str,
+    telegram_locale: str | None = None,
+    *,
+    include_live: bool = True,
+) -> tuple[str, object]:
+    async with session_scope() as session:
+        user = await ensure_user(session, telegram_id, username)
+        summary = await StashService(session).get_panel_summary(user, include_live=include_live)
+        locale = normalize_locale(user.language or telegram_locale or DEFAULT_LOCALE)
+    return build_stash_action_text(summary, slug, locale), stash_guide_keyboard(locale)
+
+
+async def load_stash_guide_panel_with_fallback(
+    telegram_id: int,
+    username: str | None,
+    slug: str,
+    telegram_locale: str | None = None,
+) -> tuple[str, object]:
+    locale = await load_user_locale(telegram_id, username, telegram_locale)
+    try:
+        return await asyncio.wait_for(
+            load_stash_guide_panel(telegram_id, username, slug, telegram_locale, include_live=True),
+            timeout=STASH_PANEL_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        text, keyboard = await load_stash_guide_panel(telegram_id, username, slug, telegram_locale, include_live=False)
+        timeout_copy = {
+            "ru": "Live stash-слой не успел прогрузиться, поэтому ниже временно показан fallback-экран по этому разделу.",
+            "en": "The live stash layer timed out, so the fallback screen for this section is shown below.",
+            "fr": "La couche live du coffre a expiré, donc un écran de secours pour cette section est affiché ci-dessous.",
+            "de": "Die Live-Stash-Schicht hat das Zeitlimit überschritten, daher wird unten der Fallback-Bildschirm für diesen Bereich angezeigt.",
+        }
+        return f"{timeout_copy.get(locale, timeout_copy['en'])}\n\n{text}", keyboard
 
 
 async def load_tracking_panel(telegram_id: int, username: str | None, telegram_locale: str | None = None) -> tuple[str, object]:
@@ -2900,7 +3137,18 @@ async def stash_open_guide(callback: CallbackQuery) -> None:
     locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     await callback.answer()
     if callback.message:
-        await callback.message.edit_text(build_stash_guide_text(guide, locale), reply_markup=stash_guide_keyboard(locale))
+        await callback.message.edit_text(stash_loading_text(locale))
+        try:
+            text, keyboard = await load_stash_guide_panel_with_fallback(
+                callback.from_user.id,
+                callback.from_user.username,
+                slug,
+                callback.from_user.language_code,
+            )
+            await callback.message.edit_text(text, reply_markup=keyboard)
+        except Exception:
+            await callback.message.edit_text(build_stash_guide_text(guide, locale), reply_markup=stash_guide_keyboard(locale))
+            raise
 
 
 @router.callback_query(F.data == "stash:account")

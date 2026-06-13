@@ -1,9 +1,17 @@
 import asyncio
 from decimal import Decimal
 
+from app.bot.handlers import build_stash_action_text
 from app.integrations.stash_market_source import MarketPriceEntry
 from app.services.poe_account import StashItemSummary, StashSnapshot, StashTabOverview
-from app.services.stash import StashService
+from app.services.stash import (
+    PricedStashCandidate,
+    StashCapabilityStatus,
+    StashCategoryTotal,
+    StashPanelSummary,
+    StashService,
+    StashTabTotal,
+)
 
 
 class _FakePrice:
@@ -191,3 +199,114 @@ def test_build_priced_candidates_supports_essences_and_div_cards() -> None:
         "A Fate Worse Than Death",
         "Screaming Essence of Hatred",
     ]
+
+
+def test_build_stash_action_text_for_liquid_uses_live_candidates() -> None:
+    summary = StashPanelSummary(
+        account_connected=True,
+        account_name="Xa1ha#6754",
+        oauth_available=True,
+        oauth_blocker=None,
+        approved_scopes=("account:stashes",),
+        stash_scopes_ready=True,
+        live_snapshot=StashSnapshot(
+            league_name="Mirage",
+            total_tabs=2,
+            folder_tabs=0,
+            special_tabs=2,
+            empty_tabs=0,
+            total_items=3,
+            sample_tabs=("Currency", "Fragments"),
+            liquid_tabs=(),
+            dense_tabs=(),
+            dump_tabs=(),
+            tabs=(),
+        ),
+        live_error=None,
+        priced_candidates=(
+            PricedStashCandidate(
+                tab_name="Currency",
+                tab_type="CurrencyStash",
+                category_key="currency",
+                item_name="Divine Orb",
+                quantity=3,
+                unit_price_chaos=587.2,
+                total_price_chaos=1762.0,
+            ),
+        ),
+        category_totals=(StashCategoryTotal(category_key="currency", total_price_chaos=3551.0),),
+        tab_totals=(StashTabTotal(tab_name="Currency", tab_type="CurrencyStash", total_price_chaos=3551.0),),
+        valuation_source="poe.ninja",
+        estimated_liquid_chaos=11875.0,
+        statuses=(StashCapabilityStatus(title="ok", status="ok", detail="ok"),),
+        next_steps=("next",),
+    )
+
+    text = build_stash_action_text(summary, "liquid", "ru")
+
+    assert "Видимая ликвидность сейчас" in text
+    assert "Divine Orb x3 [Currency]" in text
+    assert "Источник оценки: poe.ninja" in text
+    assert "live-слой" in text
+
+
+def test_build_stash_action_text_for_triage_uses_live_tabs() -> None:
+    live_snapshot = StashSnapshot(
+        league_name="Mirage",
+        total_tabs=3,
+        folder_tabs=0,
+        special_tabs=2,
+        empty_tabs=0,
+        total_items=180,
+        sample_tabs=("Currency", "Fragments", "Dump"),
+        liquid_tabs=(
+            _tab(
+                "Currency",
+                "CurrencyStash",
+                (StashItemSummary(name="Divine Orb", quantity=3, entry_count=1),),
+            ),
+        ),
+        dense_tabs=(
+            _tab(
+                "Dump",
+                "NormalStash",
+                (StashItemSummary(name="Random Rare", quantity=80, entry_count=80),),
+            ),
+        ),
+        dump_tabs=(
+            _tab(
+                "Dump",
+                "NormalStash",
+                (StashItemSummary(name="Random Rare", quantity=80, entry_count=80),),
+            ),
+        ),
+        tabs=(
+            _tab("Currency", "CurrencyStash", (StashItemSummary(name="Divine Orb", quantity=3, entry_count=1),)),
+            _tab("Fragments", "FragmentStash", (StashItemSummary(name="Horned Scarab of Nemeses", quantity=20, entry_count=1),)),
+            _tab("Dump", "NormalStash", (StashItemSummary(name="Random Rare", quantity=80, entry_count=80),)),
+        ),
+    )
+    summary = StashPanelSummary(
+        account_connected=True,
+        account_name="Xa1ha#6754",
+        oauth_available=True,
+        oauth_blocker=None,
+        approved_scopes=("account:stashes",),
+        stash_scopes_ready=True,
+        live_snapshot=live_snapshot,
+        live_error=None,
+        priced_candidates=(),
+        category_totals=(),
+        tab_totals=(StashTabTotal(tab_name="Fragments", tab_type="FragmentStash", total_price_chaos=6540.0),),
+        valuation_source="poe.ninja",
+        estimated_liquid_chaos=6540.0,
+        statuses=(StashCapabilityStatus(title="ok", status="ok", detail="ok"),),
+        next_steps=("next",),
+    )
+
+    text = build_stash_action_text(summary, "triage", "ru")
+
+    assert "Что делать прямо сейчас:" in text
+    assert "Топ вкладки по value:" in text
+    assert "Где вероятен разбор:" in text
+    assert "Fragments (fragments)" in text or "Fragments (fragment" in text
