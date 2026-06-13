@@ -46,7 +46,17 @@ class AccountSnapshot:
     poe1_primary_league: str | None
     poe1_character_count: int
     poe2_character_count: int
+    poe1_characters: tuple["CharacterSummary", ...]
+    poe2_characters: tuple["CharacterSummary", ...]
     poe1_stash_note: str | None
+
+
+@dataclass(frozen=True)
+class CharacterSummary:
+    name: str
+    league: str | None
+    level: int | None
+    class_name: str | None
 
 
 @dataclass(frozen=True)
@@ -147,6 +157,8 @@ class PoeAccountApiService:
             poe1_primary_league=self.choose_primary_poe1_league(poe1_leagues, self.settings.default_league_name),
             poe1_character_count=len(poe1_characters_payload.get("characters", [])),
             poe2_character_count=len(poe2_characters_payload.get("characters", [])),
+            poe1_characters=self._build_character_summaries(poe1_characters_payload.get("characters", [])),
+            poe2_characters=self._build_character_summaries(poe2_characters_payload.get("characters", [])),
             poe1_stash_note="Сейчас этот stash-view работает по PoE1 account stashes. PoE2 лига пока не участвует в выборе тайника.",
         )
 
@@ -339,6 +351,39 @@ class PoeAccountApiService:
             expires_in=refreshed.expires_in,
         )
         return updated.access_token or access_token
+
+    @staticmethod
+    def _build_character_summaries(characters_payload: Any) -> tuple[CharacterSummary, ...]:
+        if not isinstance(characters_payload, list):
+            return ()
+
+        characters: list[CharacterSummary] = []
+        for character in characters_payload:
+            if not isinstance(character, dict):
+                continue
+            name = str(character.get("name") or "").strip()
+            if not name:
+                continue
+            league_name = character.get("league")
+            class_name = character.get("class")
+            level_raw = character.get("level")
+            level = level_raw if isinstance(level_raw, int) else None
+            characters.append(
+                CharacterSummary(
+                    name=name,
+                    league=str(league_name).strip() if isinstance(league_name, str) and league_name.strip() else None,
+                    level=level,
+                    class_name=str(class_name).strip() if isinstance(class_name, str) and class_name.strip() else None,
+                )
+            )
+
+        characters.sort(
+            key=lambda char: (
+                -(char.level or 0),
+                char.name.lower(),
+            )
+        )
+        return tuple(characters[:3])
 
     async def _get_connected_integration(self, user: User):
         integration = await self.integrations.get_by_type(user, IntegrationType.poe_oauth)

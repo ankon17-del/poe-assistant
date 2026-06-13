@@ -408,6 +408,8 @@ def build_account_text(*, integration, oauth_config_error: str | None, locale: s
             "poe1_main": "Основная лига для stash",
             "poe1_chars": "POE1 персонажи",
             "poe2_chars": "POE2 персонажи",
+            "poe1_roster": "Кого бот видит в POE1",
+            "poe2_roster": "Кого бот видит в POE2",
             "live_error": "Ошибка live-данных",
         },
         "en": {
@@ -423,6 +425,8 @@ def build_account_text(*, integration, oauth_config_error: str | None, locale: s
             "poe1_main": "Primary stash league",
             "poe1_chars": "POE1 characters",
             "poe2_chars": "POE2 characters",
+            "poe1_roster": "Visible POE1 characters",
+            "poe2_roster": "Visible POE2 characters",
             "live_error": "Live data error",
         },
         "fr": {
@@ -438,6 +442,8 @@ def build_account_text(*, integration, oauth_config_error: str | None, locale: s
             "poe1_main": "Ligue principale pour le coffre",
             "poe1_chars": "Personnages POE1",
             "poe2_chars": "Personnages POE2",
+            "poe1_roster": "Personnages POE1 visibles",
+            "poe2_roster": "Personnages POE2 visibles",
             "live_error": "Erreur de données live",
         },
         "de": {
@@ -453,6 +459,8 @@ def build_account_text(*, integration, oauth_config_error: str | None, locale: s
             "poe1_main": "Primäre Stash-Liga",
             "poe1_chars": "POE1-Charaktere",
             "poe2_chars": "POE2-Charaktere",
+            "poe1_roster": "Sichtbare POE1-Charaktere",
+            "poe2_roster": "Sichtbare POE2-Charaktere",
             "live_error": "Live-Datenfehler",
         },
     }
@@ -476,6 +484,10 @@ def build_account_text(*, integration, oauth_config_error: str | None, locale: s
             lines.append(f"{trm['poe1_main']}: {snapshot.poe1_primary_league}")
         lines.append(f"{trm['poe1_chars']}: {snapshot.poe1_character_count}")
         lines.append(f"{trm['poe2_chars']}: {snapshot.poe2_character_count}")
+        if getattr(snapshot, "poe1_characters", ()):
+            lines.append(f"{trm['poe1_roster']}: {format_character_roster(snapshot.poe1_characters)}")
+        if getattr(snapshot, "poe2_characters", ()):
+            lines.append(f"{trm['poe2_roster']}: {format_character_roster(snapshot.poe2_characters)}")
         if getattr(snapshot, "poe1_stash_note", None):
             lines.append("")
             lines.append(snapshot.poe1_stash_note)
@@ -558,6 +570,20 @@ def build_account_summary_notes(snapshot, locale: str = DEFAULT_LOCALE) -> tuple
 
     notes.append(localized["small"])
     return tuple(notes[:3])
+
+
+def format_character_roster(characters) -> str:
+    previews: list[str] = []
+    for character in characters[:3]:
+        pieces = [character.name]
+        if getattr(character, "level", None) is not None:
+            pieces.append(f"lvl {character.level}")
+        if getattr(character, "class_name", None):
+            pieces.append(character.class_name)
+        if getattr(character, "league", None):
+            pieces.append(f"[{character.league}]")
+        previews.append(" ".join(pieces))
+    return "; ".join(previews)
 
 
 def _stash_preview_text(tab) -> str:

@@ -51,6 +51,22 @@ def test_build_item_summaries_aggregates_stack_sizes() -> None:
     assert summaries[2].quantity == 1
 
 
+def test_build_character_summaries_prefers_highest_level_characters() -> None:
+    characters = [
+        {"name": "MapperJoe", "league": "Mirage", "level": 92, "class": "Deadeye"},
+        {"name": "BosserAmy", "league": "Mirage", "level": 97, "class": "Pathfinder"},
+        {"name": "CrafterTom", "league": "Standard", "level": 88, "class": "Occultist"},
+        {"name": "Lowbie", "league": "Mirage", "level": 14, "class": "Ranger"},
+    ]
+
+    summaries = PoeAccountApiService._build_character_summaries(characters)
+
+    assert [character.name for character in summaries] == ["BosserAmy", "MapperJoe", "CrafterTom"]
+    assert summaries[0].league == "Mirage"
+    assert summaries[0].level == 97
+    assert summaries[0].class_name == "Pathfinder"
+
+
 def test_build_account_summary_notes_for_hybrid_account() -> None:
     snapshot = AccountSnapshot(
         account_name="Xa1ha#6754",
@@ -59,6 +75,8 @@ def test_build_account_summary_notes_for_hybrid_account() -> None:
         poe1_primary_league="Mirage",
         poe1_character_count=3,
         poe2_character_count=6,
+        poe1_characters=(),
+        poe2_characters=(),
         poe1_stash_note=None,
     )
 
@@ -71,6 +89,18 @@ def test_build_account_summary_notes_for_hybrid_account() -> None:
 
 
 def test_build_account_text_includes_account_aware_summary() -> None:
+    poe1_roster = PoeAccountApiService._build_character_summaries(
+        [
+            {"name": "BosserAmy", "league": "Mirage", "level": 97, "class": "Pathfinder"},
+            {"name": "MapperJoe", "league": "Mirage", "level": 92, "class": "Deadeye"},
+        ]
+    )
+    poe2_roster = PoeAccountApiService._build_character_summaries(
+        [
+            {"name": "RunesMage", "league": "Aldur Runes", "level": 88, "class": "Sorceress"},
+        ]
+    )
+
     snapshot = AccountSnapshot(
         account_name="Xa1ha#6754",
         profile_name="Xa1ha#6754",
@@ -78,6 +108,8 @@ def test_build_account_text_includes_account_aware_summary() -> None:
         poe1_primary_league="Mirage",
         poe1_character_count=5,
         poe2_character_count=2,
+        poe1_characters=poe1_roster,
+        poe2_characters=poe2_roster,
         poe1_stash_note="Сейчас этот stash-view работает по PoE1 account stashes.",
     )
 
@@ -92,3 +124,6 @@ def test_build_account_text_includes_account_aware_summary() -> None:
     assert "Короткий account-aware вывод:" in text
     assert "Mirage" in text
     assert "POE1-слой" in text
+    assert "Кого бот видит в POE1" in text
+    assert "BosserAmy lvl 97 Pathfinder [Mirage]" in text
+    assert "RunesMage lvl 88 Sorceress [Aldur Runes]" in text
