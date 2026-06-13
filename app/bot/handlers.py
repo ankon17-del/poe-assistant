@@ -408,6 +408,8 @@ def build_account_text(*, integration, oauth_config_error: str | None, locale: s
             "poe1_main": "Основная лига для stash",
             "poe1_chars": "POE1 персонажи",
             "poe2_chars": "POE2 персонажи",
+            "poe1_focus": "Текущий фокус POE1",
+            "poe2_focus": "Текущий фокус POE2",
             "poe1_roster": "Кого бот видит в POE1",
             "poe2_roster": "Кого бот видит в POE2",
             "live_error": "Ошибка live-данных",
@@ -425,6 +427,8 @@ def build_account_text(*, integration, oauth_config_error: str | None, locale: s
             "poe1_main": "Primary stash league",
             "poe1_chars": "POE1 characters",
             "poe2_chars": "POE2 characters",
+            "poe1_focus": "Current POE1 focus",
+            "poe2_focus": "Current POE2 focus",
             "poe1_roster": "Visible POE1 characters",
             "poe2_roster": "Visible POE2 characters",
             "live_error": "Live data error",
@@ -442,6 +446,8 @@ def build_account_text(*, integration, oauth_config_error: str | None, locale: s
             "poe1_main": "Ligue principale pour le coffre",
             "poe1_chars": "Personnages POE1",
             "poe2_chars": "Personnages POE2",
+            "poe1_focus": "Focus POE1 actuel",
+            "poe2_focus": "Focus POE2 actuel",
             "poe1_roster": "Personnages POE1 visibles",
             "poe2_roster": "Personnages POE2 visibles",
             "live_error": "Erreur de données live",
@@ -459,6 +465,8 @@ def build_account_text(*, integration, oauth_config_error: str | None, locale: s
             "poe1_main": "Primäre Stash-Liga",
             "poe1_chars": "POE1-Charaktere",
             "poe2_chars": "POE2-Charaktere",
+            "poe1_focus": "Aktueller POE1-Fokus",
+            "poe2_focus": "Aktueller POE2-Fokus",
             "poe1_roster": "Sichtbare POE1-Charaktere",
             "poe2_roster": "Sichtbare POE2-Charaktere",
             "live_error": "Live-Datenfehler",
@@ -484,6 +492,12 @@ def build_account_text(*, integration, oauth_config_error: str | None, locale: s
             lines.append(f"{trm['poe1_main']}: {snapshot.poe1_primary_league}")
         lines.append(f"{trm['poe1_chars']}: {snapshot.poe1_character_count}")
         lines.append(f"{trm['poe2_chars']}: {snapshot.poe2_character_count}")
+        poe1_focus = format_focus_summary(snapshot.poe1_characters)
+        poe2_focus = format_focus_summary(snapshot.poe2_characters)
+        if poe1_focus:
+            lines.append(f"{trm['poe1_focus']}: {poe1_focus}")
+        if poe2_focus:
+            lines.append(f"{trm['poe2_focus']}: {poe2_focus}")
         if getattr(snapshot, "poe1_characters", ()):
             lines.append(f"{trm['poe1_roster']}: {format_character_roster(snapshot.poe1_characters)}")
         if getattr(snapshot, "poe2_characters", ()):
@@ -584,6 +598,34 @@ def format_character_roster(characters) -> str:
             pieces.append(f"[{character.league}]")
         previews.append(" ".join(pieces))
     return "; ".join(previews)
+
+
+def format_focus_summary(characters) -> str | None:
+    if not characters:
+        return None
+
+    league_counts: dict[str, int] = {}
+    for character in characters:
+        if getattr(character, "league", None):
+            league_counts[character.league] = league_counts.get(character.league, 0) + 1
+
+    focus_league = None
+    if league_counts:
+        focus_league = sorted(
+            league_counts.items(),
+            key=lambda item: (-item[1], item[0].lower()),
+        )[0][0]
+
+    top_character = characters[0]
+    headline = top_character.name
+    if getattr(top_character, "level", None) is not None:
+        headline += f" lvl {top_character.level}"
+    if getattr(top_character, "class_name", None):
+        headline += f" {top_character.class_name}"
+
+    if focus_league:
+        return f"{focus_league} ({headline})"
+    return headline
 
 
 def _stash_preview_text(tab) -> str:

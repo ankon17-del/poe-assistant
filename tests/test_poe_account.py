@@ -124,6 +124,8 @@ def test_build_account_text_includes_account_aware_summary() -> None:
     assert "Короткий account-aware вывод:" in text
     assert "Mirage" in text
     assert "POE1-слой" in text
+    assert "Текущий фокус POE1: Mirage (BosserAmy lvl 97 Pathfinder)" in text
+    assert "Текущий фокус POE2: Aldur Runes (RunesMage lvl 88 Sorceress)" in text
     assert "Кого бот видит в POE1" in text
     assert "BosserAmy lvl 97 Pathfinder [Mirage]" in text
     assert "RunesMage lvl 88 Sorceress [Aldur Runes]" in text
