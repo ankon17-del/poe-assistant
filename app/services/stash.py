@@ -52,6 +52,8 @@ class StashPanelSummary:
 @dataclass(frozen=True)
 class PricedStashCandidate:
     tab_name: str
+    tab_type: str
+    category_key: str
     item_name: str
     quantity: int
     unit_price_chaos: float
@@ -391,6 +393,8 @@ class StashService:
             candidates.append(
                 PricedStashCandidate(
                     tab_name=tab_name,
+                    tab_type=tab_type,
+                    category_key=category_key,
                     item_name=item_name,
                     quantity=quantity,
                     unit_price_chaos=float(unit_price),

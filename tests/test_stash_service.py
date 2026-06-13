@@ -121,6 +121,8 @@ def test_build_priced_candidates_uses_currency_source_for_liquid_tabs() -> None:
         ("Fragments", 30.0),
     ]
     assert candidates[0].item_name == "Divine Orb"
+    assert candidates[0].category_key == "currency"
+    assert candidates[0].tab_type == "CurrencyStash"
     assert candidates[0].total_price_chaos == 360.0
     assert candidates[1].item_name == "Chaos Orb"
     assert candidates[1].total_price_chaos == 40.0
@@ -183,6 +185,8 @@ def test_build_priced_candidates_supports_essences_and_div_cards() -> None:
         ("Div Cards", 88.0),
         ("Essences", 24.0),
     ]
+    assert candidates[0].category_key == "div_cards"
+    assert candidates[0].tab_type == "DivinationCardStash"
     assert [candidate.item_name for candidate in candidates] == [
         "A Fate Worse Than Death",
         "Screaming Essence of Hatred",

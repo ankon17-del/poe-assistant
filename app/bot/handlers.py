@@ -228,6 +228,40 @@ def build_fast_cash_notes(summary, locale: str = DEFAULT_LOCALE) -> tuple[str, .
     return tuple(notes)
 
 
+def build_bulk_sale_notes(summary, locale: str = DEFAULT_LOCALE) -> tuple[str, ...]:
+    liquid_categories = {"currency", "fragments", "essences", "div_cards"}
+    candidates = [
+        candidate
+        for candidate in summary.priced_candidates
+        if candidate.category_key in liquid_categories
+        and candidate.quantity >= 2
+        and candidate.total_price_chaos >= 100
+    ]
+    if not candidates:
+        return ()
+
+    copy = {
+        "ru": "{item_name} x{quantity} из {tab_name} ({category}) ~= {total} chaos. Это хороший кандидат на быстрый bulk-sale.",
+        "en": "{item_name} x{quantity} from {tab_name} ({category}) ~= {total} chaos. Good candidate for a quick bulk sale.",
+    }
+    template = copy.get(locale, copy["en"])
+
+    notes: list[str] = []
+    for candidate in candidates[:3]:
+        total_text = format_market_value(Decimal(str(candidate.total_price_chaos)))
+        category_name = stash_category_label(candidate.category_key, locale).lower()
+        notes.append(
+            template.format(
+                item_name=candidate.item_name,
+                quantity=candidate.quantity,
+                tab_name=candidate.tab_name,
+                category=category_name,
+                total=total_text,
+            )
+        )
+    return tuple(notes)
+
+
 def build_tracking_lines(item) -> list[str]:
     league_name = item.league.name if item.league else "Без лиги"
     game_label = "POE 2" if item.league and item.league.realm == "poe2" else "POE 1"
@@ -595,6 +629,12 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
         "fr": "Quick cash-out",
         "de": "Quick cash-out",
     }.get(locale, "Quick cash-out")
+    bulk_sale_label = {
+        "ru": "Что можно быстро конвертнуть",
+        "en": "Quick bulk-sale ideas",
+        "fr": "Quick bulk-sale ideas",
+        "de": "Quick bulk-sale ideas",
+    }.get(locale, "Quick bulk-sale ideas")
     quick_open_label = {
         "ru": "Что открыть прямо сейчас",
         "en": "Open these tabs first",
@@ -692,6 +732,12 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
                 if fast_cash_notes:
                     lines.append(f"{fast_cash_label}:")
                     for note in fast_cash_notes:
+                        lines.append(f"- {note}")
+                    lines.append("")
+                bulk_sale_notes = build_bulk_sale_notes(summary, locale)
+                if bulk_sale_notes:
+                    lines.append(f"{bulk_sale_label}:")
+                    for note in bulk_sale_notes:
                         lines.append(f"- {note}")
                     lines.append("")
                 lines.append(f"{top_tabs_label}:")
