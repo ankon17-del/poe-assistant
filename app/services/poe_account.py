@@ -43,6 +43,13 @@ class AccountSnapshot:
 
 
 @dataclass(frozen=True)
+class StashItemSummary:
+    name: str
+    quantity: int
+    entry_count: int
+
+
+@dataclass(frozen=True)
 class StashTabOverview:
     id: str
     name: str
@@ -53,6 +60,7 @@ class StashTabOverview:
     priority_score: int
     priority_reason: str | None
     preview_items: tuple[str, ...]
+    item_summaries: tuple[StashItemSummary, ...]
 
 
 @dataclass(frozen=True)
@@ -317,6 +325,7 @@ class PoeAccountApiService:
         item_count = len(items)
         is_special = raw_type not in self._normal_tab_types
         preview_items = tuple(self._format_item_preview(item) for item in list(items)[:3])
+        item_summaries = self._build_item_summaries(items)
         priority_score = item_count + self._liquid_type_bonus.get(raw_type, 0)
         priority_reason = self._priority_reason(raw_type)
 
@@ -330,6 +339,7 @@ class PoeAccountApiService:
             priority_score=priority_score,
             priority_reason=priority_reason,
             preview_items=preview_items,
+            item_summaries=item_summaries,
         )
 
     @classmethod
@@ -368,6 +378,39 @@ class PoeAccountApiService:
         else:
             text = f"{prefix}{name or type_line or 'item'}".strip()
         return text[:48] + "..." if len(text) > 48 else text
+
+    @classmethod
+    def _build_item_summaries(
+        cls,
+        items: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+    ) -> tuple[StashItemSummary, ...]:
+        aggregated: dict[str, list[int]] = {}
+        for item in items:
+            display_name = cls._format_item_name(item)
+            if not display_name:
+                continue
+            quantity = item.get("stackSize")
+            stack_quantity = quantity if isinstance(quantity, int) and quantity > 0 else 1
+            bucket = aggregated.setdefault(display_name, [0, 0])
+            bucket[0] += stack_quantity
+            bucket[1] += 1
+
+        ordered = sorted(
+            (
+                StashItemSummary(name=name, quantity=totals[0], entry_count=totals[1])
+                for name, totals in aggregated.items()
+            ),
+            key=lambda summary: (-summary.quantity, -summary.entry_count, summary.name),
+        )
+        return tuple(ordered)
+
+    @staticmethod
+    def _format_item_name(item: dict[str, Any]) -> str:
+        name = str(item.get("name") or "").strip()
+        type_line = str(item.get("typeLine") or item.get("baseType") or "").strip()
+        if name and type_line:
+            return f"{name} {type_line}".strip()
+        return name or type_line or ""
 
     @staticmethod
     def choose_primary_poe1_league(leagues: tuple[str, ...], fallback_default: str | None = None) -> str | None:

@@ -339,6 +339,8 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "items": "предметов в просмотренных вкладках",
             "sample": "Примеры вкладок",
             "takeaways": "What to do first",
+            "sell": "What to sell first",
+            "source": "Valuation source",
             "liquid": "Что проверить первым",
             "dense": "Самые плотные вкладки",
             "dump": "Что похоже на dump-разбор",
@@ -359,6 +361,8 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "items": "items in reviewed tabs",
             "takeaways": "What to do first",
             "sample": "Sample tabs",
+            "sell": "What to sell first",
+            "source": "Valuation source",
             "liquid": "Check these first",
             "dense": "Densest tabs",
             "dump": "Likely dump tabs",
@@ -379,6 +383,8 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "items": "objets dans les onglets analysés",
             "takeaways": "Par quoi commencer",
             "sample": "Exemples d'onglets",
+            "sell": "? vendre en premier",
+            "source": "Source d'estimation",
             "liquid": "À vérifier en premier",
             "dense": "Onglets les plus chargés",
             "dump": "Onglets à trier",
@@ -399,6 +405,8 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "items": "Items in geprüften Tabs",
             "takeaways": "Womit du anfangen solltest",
             "sample": "Beispiel-Tabs",
+            "sell": "Das zuerst verkaufen",
+            "source": "Bewertungsquelle",
             "liquid": "Das zuerst prüfen",
             "dense": "Dichteste Tabs",
             "dump": "Tabs zum Aussortieren",
@@ -445,6 +453,17 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             lines.append(f"{trm['takeaways']}:")
             for takeaway in takeaways:
                 lines.append(f"- {takeaway}")
+        if summary.priced_candidates:
+            lines.append("")
+            lines.append(f"{trm['sell']}:")
+            for candidate in summary.priced_candidates[:6]:
+                unit_text = format_decimal(Decimal(str(candidate.unit_price_chaos)))
+                total_text = format_decimal(Decimal(str(candidate.total_price_chaos)))
+                lines.append(
+                    f"- {candidate.item_name} x{candidate.quantity} [{candidate.tab_name}] ~ {total_text} chaos ({unit_text}c/ea)"
+                )
+            if summary.valuation_source:
+                lines.append(f"- {trm['source']}: {summary.valuation_source}")
         if live.liquid_tabs:
             lines.append("")
             lines.append(f"{trm['liquid']}:")
