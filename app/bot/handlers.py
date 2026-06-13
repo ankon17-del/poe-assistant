@@ -254,7 +254,12 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "tabs": "вкладок",
             "folders": "папок",
             "special": "спец-вкладок",
+            "empty": "пустых вкладок",
+            "items": "предметов в просмотренных вкладках",
             "sample": "Примеры вкладок",
+            "liquid": "Что проверить первым",
+            "dense": "Самые плотные вкладки",
+            "dump": "Что похоже на dump-разбор",
             "next_steps": "Следующие шаги:",
             "footer": "Phase 6 теперь активна: официальный OAuth получен, и дальше мы переводим тайник из read-only readiness в реальный личный stash assistant.",
         },
@@ -268,7 +273,12 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "tabs": "tabs",
             "folders": "folders",
             "special": "special tabs",
+            "empty": "empty tabs",
+            "items": "items in reviewed tabs",
             "sample": "Sample tabs",
+            "liquid": "Check these first",
+            "dense": "Densest tabs",
+            "dump": "Likely dump tabs",
             "next_steps": "Next steps:",
             "footer": "Phase 6 is now active: official OAuth is in place, and the next move is to turn stash readiness into a real personal stash assistant.",
         },
@@ -282,7 +292,12 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "tabs": "onglets",
             "folders": "dossiers",
             "special": "onglets spéciaux",
+            "empty": "onglets vides",
+            "items": "objets dans les onglets analysés",
             "sample": "Exemples d'onglets",
+            "liquid": "À vérifier en premier",
+            "dense": "Onglets les plus chargés",
+            "dump": "Onglets à trier",
             "next_steps": "Étapes suivantes :",
             "footer": "La phase 6 est maintenant active : l'OAuth officiel est obtenu, et la suite consiste à transformer ce panneau en véritable assistant de coffre personnel.",
         },
@@ -296,7 +311,12 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "tabs": "Tabs",
             "folders": "Ordner",
             "special": "Spezial-Tabs",
+            "empty": "leere Tabs",
+            "items": "Items in geprüften Tabs",
             "sample": "Beispiel-Tabs",
+            "liquid": "Das zuerst prüfen",
+            "dense": "Dichteste Tabs",
+            "dump": "Tabs zum Aussortieren",
             "next_steps": "Nächste Schritte:",
             "footer": "Phase 6 ist jetzt aktiv: offizielles OAuth ist da, und als Nächstes bauen wir daraus einen echten persönlichen Stash-Assistenten.",
         },
@@ -330,8 +350,36 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
         lines.append(f"- {live.total_tabs} {trm['tabs']}")
         lines.append(f"- {live.folder_tabs} {trm['folders']}")
         lines.append(f"- {live.special_tabs} {trm['special']}")
+        lines.append(f"- {live.empty_tabs} {trm['empty']}")
+        lines.append(f"- {live.total_items} {trm['items']}")
         if live.sample_tabs:
             lines.append(f"- {trm['sample']}: {', '.join(live.sample_tabs)}")
+        if live.liquid_tabs:
+            lines.append("")
+            lines.append(f"{trm['liquid']}:")
+            for tab in live.liquid_tabs:
+                line = f"- {tab.name}: {tab.item_count}"
+                if tab.priority_reason:
+                    line += f" ({tab.priority_reason})"
+                if tab.preview_items:
+                    line += f" — {', '.join(tab.preview_items)}"
+                lines.append(line)
+        if live.dense_tabs:
+            lines.append("")
+            lines.append(f"{trm['dense']}:")
+            for tab in live.dense_tabs:
+                line = f"- {tab.name}: {tab.item_count}"
+                if tab.preview_items:
+                    line += f" — {', '.join(tab.preview_items)}"
+                lines.append(line)
+        if live.dump_tabs:
+            lines.append("")
+            lines.append(f"{trm['dump']}:")
+            for tab in live.dump_tabs:
+                line = f"- {tab.name}: {tab.item_count}"
+                if tab.preview_items:
+                    line += f" — {', '.join(tab.preview_items)}"
+                lines.append(line)
     elif summary.live_error:
         lines.append("")
         lines.append(f"{trm['live']} {summary.live_error}")

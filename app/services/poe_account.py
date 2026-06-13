@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -42,15 +43,62 @@ class AccountSnapshot:
 
 
 @dataclass(frozen=True)
+class StashTabOverview:
+    id: str
+    name: str
+    type: str
+    item_count: int
+    is_folder: bool
+    is_special: bool
+    priority_score: int
+    priority_reason: str | None
+    preview_items: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class StashSnapshot:
     league_name: str
     total_tabs: int
     folder_tabs: int
     special_tabs: int
+    empty_tabs: int
+    total_items: int
     sample_tabs: tuple[str, ...]
+    liquid_tabs: tuple[StashTabOverview, ...]
+    dense_tabs: tuple[StashTabOverview, ...]
+    dump_tabs: tuple[StashTabOverview, ...]
+    tabs: tuple[StashTabOverview, ...]
 
 
 class PoeAccountApiService:
+    _special_type_labels = {
+        "CurrencyStash": "Currency",
+        "FragmentStash": "Fragments",
+        "MapStash": "Maps",
+        "DivinationCardStash": "Div Cards",
+        "EssenceStash": "Essences",
+        "DelveStash": "Delve",
+        "BlightStash": "Blight",
+        "DeliriumStash": "Delirium",
+        "UltimatumStash": "Ultimatum",
+        "GemStash": "Gems",
+        "FlaskStash": "Flasks",
+        "UniqueStash": "Uniques",
+    }
+    _liquid_type_bonus = {
+        "CurrencyStash": 120,
+        "FragmentStash": 110,
+        "EssenceStash": 100,
+        "DivinationCardStash": 95,
+        "MapStash": 85,
+        "DelveStash": 70,
+        "BlightStash": 70,
+        "DeliriumStash": 65,
+        "UltimatumStash": 65,
+        "UniqueStash": 50,
+    }
+    _normal_tab_types = {"NormalStash", "PremiumStash", "QuadStash", "Folder"}
+
     def __init__(self, session: AsyncSession):
         self.session = session
         self.settings = get_settings()
@@ -77,7 +125,7 @@ class PoeAccountApiService:
             poe1_primary_league=self.choose_primary_poe1_league(poe1_leagues, self.settings.default_league_name),
             poe1_character_count=len(poe1_characters_payload.get("characters", [])),
             poe2_character_count=len(poe2_characters_payload.get("characters", [])),
-            poe1_stash_note="PoE1 stash is selected from PoE1 account leagues only. PoE2 leagues are not used for this stash view yet.",
+            poe1_stash_note="Сейчас этот stash-view работает по PoE1 account stashes. PoE2 лига пока не участвует в выборе тайника.",
         )
 
     async def get_stash_snapshot(self, user: User, league_name: str | None = None) -> StashSnapshot:
@@ -93,32 +141,75 @@ class PoeAccountApiService:
             raise PoeAccountApiError("No PoE1 league is available for stash access.")
 
         stashes_payload = await self._authorized_get_json(user, integration, f"/stash/{selected_league}")
-        stash_tabs = stashes_payload.get("stashes", [])
+        listed_stashes = stashes_payload.get("stashes", [])
+        if not isinstance(listed_stashes, list):
+            raise PoeAccountApiError("PoE API returned an unexpected stash list payload.")
 
-        total_tabs = len(stash_tabs)
-        folder_tabs = 0
-        special_tabs = 0
-        sample_tabs: list[str] = []
-        generic_types = {"NormalStash", "PremiumStash", "QuadStash", "Folder", "MapStash"}
+        folder_tabs = sum(
+            1
+            for stash in listed_stashes
+            if self._is_folder_tab(stash)
+        )
+        sample_tabs = tuple(
+            self._normalize_tab_name(stash)
+            for stash in listed_stashes[:5]
+        )
 
-        for stash in stash_tabs:
-            stash_type = stash.get("type") or ""
-            child_tabs = stash.get("stashes") or ()
-            if stash_type == "Folder" or child_tabs:
-                folder_tabs += 1
-            if stash_type and stash_type not in generic_types:
-                special_tabs += 1
+        leaf_tabs = [stash for stash in listed_stashes if not self._is_folder_tab(stash)]
+        detail_payloads = await asyncio.gather(
+            *(self._fetch_stash_detail(user, integration, selected_league, stash) for stash in leaf_tabs),
+            return_exceptions=True,
+        )
 
-            label = stash.get("name") or stash_type or stash.get("id")
-            if label and len(sample_tabs) < 5:
-                sample_tabs.append(str(label))
+        tab_overviews: list[StashTabOverview] = []
+        for listed_stash, detail in zip(leaf_tabs, detail_payloads):
+            if isinstance(detail, Exception):
+                overview = self._build_tab_overview_from_listing(listed_stash, ())
+            else:
+                stash_payload = detail.get("stash") if isinstance(detail, dict) and "stash" in detail else detail
+                items = stash_payload.get("items", []) if isinstance(stash_payload, dict) else []
+                overview = self._build_tab_overview_from_listing(listed_stash, items)
+            tab_overviews.append(overview)
+
+        special_tabs = sum(1 for tab in tab_overviews if tab.is_special)
+        empty_tabs = sum(1 for tab in tab_overviews if tab.item_count == 0)
+        total_items = sum(tab.item_count for tab in tab_overviews)
+
+        liquid_tabs = tuple(
+            sorted(
+                [tab for tab in tab_overviews if tab.priority_reason],
+                key=lambda tab: (-tab.priority_score, -tab.item_count, tab.name),
+            )[:4]
+        )
+        dense_tabs = tuple(
+            sorted(
+                [tab for tab in tab_overviews if tab.item_count > 0],
+                key=lambda tab: (-tab.item_count, -tab.priority_score, tab.name),
+            )[:4]
+        )
+        dump_tabs = tuple(
+            sorted(
+                [
+                    tab
+                    for tab in tab_overviews
+                    if not tab.is_special and tab.item_count >= 20
+                ],
+                key=lambda tab: (-tab.item_count, tab.name),
+            )[:4]
+        )
 
         return StashSnapshot(
             league_name=selected_league,
-            total_tabs=total_tabs,
+            total_tabs=len(tab_overviews),
             folder_tabs=folder_tabs,
             special_tabs=special_tabs,
-            sample_tabs=tuple(sample_tabs),
+            empty_tabs=empty_tabs,
+            total_items=total_items,
+            sample_tabs=sample_tabs,
+            liquid_tabs=liquid_tabs,
+            dense_tabs=dense_tabs,
+            dump_tabs=dump_tabs,
+            tabs=tuple(tab_overviews),
         )
 
     async def _authorized_get_json(self, user: User, integration, path: str) -> dict[str, Any]:
@@ -197,6 +288,82 @@ class PoeAccountApiService:
         if integration is None:
             raise PoeAccountNotConnectedError("PoE account is not connected.")
         return integration
+
+    async def _fetch_stash_detail(
+        self,
+        user: User,
+        integration,
+        league_name: str,
+        listed_stash: dict[str, Any],
+    ) -> dict[str, Any]:
+        stash_id = listed_stash.get("id")
+        if not stash_id:
+            return listed_stash
+
+        parent_id = listed_stash.get("parent")
+        if parent_id:
+            path = f"/stash/{league_name}/{parent_id}/{stash_id}"
+        else:
+            path = f"/stash/{league_name}/{stash_id}"
+        return await self._authorized_get_json(user, integration, path)
+
+    def _build_tab_overview_from_listing(
+        self,
+        listed_stash: dict[str, Any],
+        items: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+    ) -> StashTabOverview:
+        raw_type = str(listed_stash.get("type") or "Unknown")
+        name = self._normalize_tab_name(listed_stash)
+        item_count = len(items)
+        is_special = raw_type not in self._normal_tab_types
+        preview_items = tuple(self._format_item_preview(item) for item in list(items)[:3])
+        priority_score = item_count + self._liquid_type_bonus.get(raw_type, 0)
+        priority_reason = self._priority_reason(raw_type)
+
+        return StashTabOverview(
+            id=str(listed_stash.get("id") or ""),
+            name=name,
+            type=raw_type,
+            item_count=item_count,
+            is_folder=self._is_folder_tab(listed_stash),
+            is_special=is_special,
+            priority_score=priority_score,
+            priority_reason=priority_reason,
+            preview_items=preview_items,
+        )
+
+    @classmethod
+    def _priority_reason(cls, raw_type: str) -> str | None:
+        label = cls._special_type_labels.get(raw_type)
+        if label:
+            return label
+        return None
+
+    @classmethod
+    def _normalize_tab_name(cls, stash: dict[str, Any]) -> str:
+        name = str(stash.get("name") or "").strip()
+        raw_type = str(stash.get("type") or "Unknown")
+        label = cls._special_type_labels.get(raw_type)
+        if label and name:
+            return f"{name} ({label})"
+        if label:
+            return label
+        return name or raw_type
+
+    @staticmethod
+    def _is_folder_tab(stash: dict[str, Any]) -> bool:
+        metadata = stash.get("metadata") or {}
+        return bool(metadata.get("folder")) or stash.get("type") == "Folder" or stash.get("children")
+
+    @classmethod
+    def _format_item_preview(cls, item: dict[str, Any]) -> str:
+        name = str(item.get("name") or "").strip()
+        type_line = str(item.get("typeLine") or item.get("baseType") or "").strip()
+        stack_size = item.get("stackSize")
+        prefix = f"{stack_size}x " if isinstance(stack_size, int) and stack_size > 1 else ""
+        if name and type_line:
+            return f"{prefix}{name} {type_line}".strip()
+        return f"{prefix}{name or type_line or 'item'}".strip()
 
     @staticmethod
     def choose_primary_poe1_league(leagues: tuple[str, ...], fallback_default: str | None = None) -> str | None:

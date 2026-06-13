@@ -1,5 +1,39 @@
 # POE / POE2 Telegram Assistant - Roadmap V2
 
+## Update 2026-06-13
+
+Текущий главный вектор проекта смещён из режима "готовим OAuth/stash foundation" в режим
+"строим полезный personal stash assistant на официальных account scopes".
+
+### Актуальный приоритет по фазам
+
+- Phase 1: готово
+- Phase 2: частично готово, currency-case живой, item trade polling всё ещё ограничен внешним 403
+- Phase 3: сильно готово
+- Phase 4: хорошо для POE2, частично для POE1
+- Phase 5: сильный foundation уже собран
+- Phase 6: активная рабочая фаза прямо сейчас
+- Phase 7: отложена
+- Phase 8-10: вторичный приоритет, пока не добьём полезность stash/account слоя
+
+### Phase 6 - текущий milestone
+
+1. official OAuth уже работает
+2. account linking уже работает
+3. live PoE1 stash-read уже работает
+4. теперь цель — превратить `/stash` в полезный экран:
+   - liquid tabs
+   - dense tabs
+   - dump candidates
+   - what to check first
+   - дальше hidden liquidity и sell-first hints
+
+### Ближайший маршрут
+
+1. Дожать stash assistant v1 до реально полезного summary
+2. Добавить вторую волну stash-insights по ликвидности и приоритету продажи
+3. После этого переходить к account-aware recommendations и расширению экономического слоя
+
 Актуализировано по фактическому состоянию репозитория и Railway-деплоя на `2026-05-12`.
 
 ## 1. Где мы сейчас
@@ -383,4 +417,3 @@ Railway worker получает:
 1. **добить полезный manual слой Phase 6**
 2. **потом решить: идём в Phase 7 или возвращаемся к техническим долгам**
 3. **когда GGG откроют доступ — резко усиливаем account/stash сторону**
-
