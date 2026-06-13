@@ -1162,6 +1162,26 @@ async def load_stash_panel(telegram_id: int, username: str | None, telegram_loca
     return build_stash_text(summary, locale), stash_keyboard(connect_url=connect_url, account_connected=summary.account_connected, locale=locale)
 
 
+def stash_loading_text(locale: str = DEFAULT_LOCALE) -> str:
+    copy = {
+        "ru": "Обновляю stash-анализ. Это может занять несколько секунд, если бот тянет live-данные и рынок.",
+        "en": "Refreshing stash analysis. This can take a few seconds while the bot loads live stash and market data.",
+        "fr": "Mise à jour de l'analyse du coffre. Cela peut prendre quelques secondes pendant le chargement des données live.",
+        "de": "Die Stash-Analyse wird aktualisiert. Das kann ein paar Sekunden dauern, während Live-Daten geladen werden.",
+    }
+    return copy.get(locale, copy["en"])
+
+
+def stash_loading_failed_text(locale: str = DEFAULT_LOCALE) -> str:
+    copy = {
+        "ru": "Не удалось обновить stash-анализ с первой попытки. Попробуй ещё раз через /stash или кнопку обновления чуть позже.",
+        "en": "The stash analysis could not be refreshed on the first try. Please try /stash again or use refresh a bit later.",
+        "fr": "L'analyse du coffre n'a pas pu être mise à jour du premier coup. Réessaie avec /stash ou le bouton d'actualisation un peu plus tard.",
+        "de": "Die Stash-Analyse konnte beim ersten Versuch nicht aktualisiert werden. Bitte versuche /stash oder die Aktualisierung etwas später erneut.",
+    }
+    return copy.get(locale, copy["en"])
+
+
 async def load_tracking_panel(telegram_id: int, username: str | None, telegram_locale: str | None = None) -> tuple[str, object]:
     async with session_scope() as session:
         user = await ensure_user(session, telegram_id, username)
@@ -1503,10 +1523,16 @@ async def menu_account_open(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:stash:open")
 async def menu_stash_open(callback: CallbackQuery) -> None:
-    text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
-    if callback.message:
-        await callback.message.edit_text(text, reply_markup=keyboard)
     await callback.answer()
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
+    if callback.message:
+        await callback.message.edit_text(stash_loading_text(locale))
+        try:
+            text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
+            await callback.message.edit_text(text, reply_markup=keyboard)
+        except Exception:
+            await callback.message.edit_text(stash_loading_failed_text(locale))
+            raise
 
 
 @router.callback_query(F.data == "menu:add")
@@ -1524,8 +1550,14 @@ async def account(message: Message) -> None:
 
 @router.message(Command("stash"))
 async def stash(message: Message) -> None:
-    text, keyboard = await load_stash_panel(message.from_user.id, message.from_user.username, message.from_user.language_code)
-    await message.answer(text, reply_markup=keyboard)
+    locale = await load_user_locale(message.from_user.id, message.from_user.username, message.from_user.language_code)
+    loading_message = await message.answer(stash_loading_text(locale))
+    try:
+        text, keyboard = await load_stash_panel(message.from_user.id, message.from_user.username, message.from_user.language_code)
+        await loading_message.edit_text(text, reply_markup=keyboard)
+    except Exception:
+        await loading_message.edit_text(stash_loading_failed_text(locale))
+        raise
 
 
 @router.message(Command("builds"))
@@ -2263,18 +2295,30 @@ async def disconnect_account(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "stash:refresh")
 async def refresh_stash_panel(callback: CallbackQuery) -> None:
-    text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     await callback.answer()
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
-        await callback.message.edit_text(text, reply_markup=keyboard)
+        await callback.message.edit_text(stash_loading_text(locale))
+        try:
+            text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
+            await callback.message.edit_text(text, reply_markup=keyboard)
+        except Exception:
+            await callback.message.edit_text(stash_loading_failed_text(locale))
+            raise
 
 
 @router.callback_query(F.data == "stash:back:panel")
 async def stash_back_to_panel(callback: CallbackQuery) -> None:
-    text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     await callback.answer()
+    locale = await load_user_locale(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
     if callback.message:
-        await callback.message.edit_text(text, reply_markup=keyboard)
+        await callback.message.edit_text(stash_loading_text(locale))
+        try:
+            text, keyboard = await load_stash_panel(callback.from_user.id, callback.from_user.username, callback.from_user.language_code)
+            await callback.message.edit_text(text, reply_markup=keyboard)
+        except Exception:
+            await callback.message.edit_text(stash_loading_failed_text(locale))
+            raise
 
 
 @router.callback_query(F.data.startswith("stash:guide:"))
