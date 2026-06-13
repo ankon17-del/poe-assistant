@@ -479,6 +479,18 @@ def build_account_text(*, integration, oauth_config_error: str | None, locale: s
         if getattr(snapshot, "poe1_stash_note", None):
             lines.append("")
             lines.append(snapshot.poe1_stash_note)
+        summary_notes = build_account_summary_notes(snapshot, locale)
+        if summary_notes:
+            lines.append("")
+            summary_title = {
+                "ru": "Короткий account-aware вывод:",
+                "en": "Account-aware summary:",
+                "fr": "Résumé orienté compte :",
+                "de": "Account-aware-Zusammenfassung:",
+            }.get(locale, "Account-aware summary:")
+            lines.append(summary_title)
+            for note in summary_notes:
+                lines.append(f"- {note}")
 
     if oauth_config_error:
         lines.append("")
@@ -494,6 +506,58 @@ def build_account_text(*, integration, oauth_config_error: str | None, locale: s
         lines.append(trm["connect_hint"])
 
     return "\n".join(lines)
+
+
+def build_account_summary_notes(snapshot, locale: str = DEFAULT_LOCALE) -> tuple[str, ...]:
+    if not snapshot:
+        return ()
+
+    copy = {
+        "ru": {
+            "primary": "Для stash-анализа бот сейчас опирается на PoE1-лигу {league}. Это главная лига, вокруг которой строится твой личный stash assistant.",
+            "poe2_bias": "На аккаунте сейчас больше персонажей в POE2, чем в POE1. Значит следующий account-aware слой стоит сильнее завязать на твой текущий POE2-цикл.",
+            "poe1_bias": "На аккаунте сейчас сильнее выражен POE1-слой. Значит stash, лига и sell-first логика уже работают в самом полезном для тебя контуре.",
+            "hybrid": "Аккаунт выглядит гибридным: ты держишь активность и в POE1, и в POE2. Это хороший кейс для дальнейшего cross-game assistant слоя.",
+            "small": "Следующий логичный шаг — связать stash-аналитику с персонажами и текущей лигой, чтобы советы стали еще персональнее.",
+        },
+        "en": {
+            "primary": "The bot currently uses the PoE1 league {league} as the anchor for stash analysis.",
+            "poe2_bias": "Your account currently has more POE2 characters than POE1 characters, so the next account-aware layer should bias recommendations toward your current POE2 cycle.",
+            "poe1_bias": "Your account currently leans more toward POE1, so stash, league, and sell-first logic are already operating in the most useful loop.",
+            "hybrid": "This looks like a hybrid account with activity in both POE1 and POE2.",
+            "small": "The next logical step is to connect stash analysis with characters and current league context.",
+        },
+        "fr": {
+            "primary": "Pour l'analyse du coffre, le bot utilise actuellement la ligue PoE1 {league} comme point d'ancrage.",
+            "poe2_bias": "Ton compte a actuellement plus de personnages en POE2 qu'en POE1. Le prochain niveau account-aware devrait donc mieux suivre ton cycle POE2 actuel.",
+            "poe1_bias": "Ton compte penche actuellement davantage vers POE1, donc la logique stash, ligue et sell-first tourne déjà dans la boucle la plus utile.",
+            "hybrid": "Le compte paraît hybride, avec de l'activité à la fois sur POE1 et POE2.",
+            "small": "L'étape logique suivante consiste à relier l'analyse du coffre aux personnages et au contexte de ligue.",
+        },
+        "de": {
+            "primary": "Für die Stash-Analyse nutzt der Bot derzeit die PoE1-Liga {league} als Anker.",
+            "poe2_bias": "Auf deinem Konto gibt es aktuell mehr POE2- als POE1-Charaktere. Die nächste account-aware Schicht sollte sich daher stärker an deinem aktuellen POE2-Zyklus orientieren.",
+            "poe1_bias": "Dein Konto ist aktuell stärker auf POE1 ausgerichtet, daher laufen Stash-, Liga- und Sell-first-Logik bereits in der nützlichsten Schleife.",
+            "hybrid": "Das Konto wirkt hybrid, mit Aktivität sowohl in POE1 als auch in POE2.",
+            "small": "Der nächste logische Schritt ist, die Stash-Analyse mit Charakteren und aktuellem Liga-Kontext zu verbinden.",
+        },
+    }
+    localized = copy.get(locale, copy["en"])
+
+    notes: list[str] = []
+    if snapshot.poe1_primary_league:
+        notes.append(localized["primary"].format(league=snapshot.poe1_primary_league))
+
+    if snapshot.poe2_character_count > snapshot.poe1_character_count:
+        notes.append(localized["poe2_bias"])
+    elif snapshot.poe1_character_count > snapshot.poe2_character_count:
+        notes.append(localized["poe1_bias"])
+
+    if snapshot.poe1_character_count > 0 and snapshot.poe2_character_count > 0:
+        notes.append(localized["hybrid"])
+
+    notes.append(localized["small"])
+    return tuple(notes[:3])
 
 
 def _stash_preview_text(tab) -> str:
