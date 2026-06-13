@@ -538,6 +538,31 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
         "fr": "Top tabs by value",
         "de": "Top tabs by value",
     }.get(locale, "Top tabs by value")
+    quick_open_label = {
+        "ru": "Что открыть прямо сейчас",
+        "en": "Open these tabs first",
+        "fr": "Open these tabs first",
+        "de": "Open these tabs first",
+    }.get(locale, "Open these tabs first")
+    category_labels = {
+        "ru": {
+            "currency": "Валюта",
+            "fragments": "Фрагменты",
+            "essences": "Эссенции",
+            "div_cards": "Карточки",
+            "maps": "Карты",
+            "other": "Прочее",
+        }
+    }.get(locale, {})
+    tab_type_labels = {
+        "ru": {
+            "CurrencyStash": "валюта",
+            "FragmentStash": "фрагменты",
+            "EssenceStash": "эссенции",
+            "DivinationCardStash": "карточки",
+            "MapStash": "карты",
+        }
+    }.get(locale, {})
     lines = [trm["title"], ""]
 
     if summary.account_connected:
@@ -590,14 +615,31 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
                 lines.append(f"{category_breakdown_label}:")
                 for category in summary.category_totals:
                     total_text = format_market_value(Decimal(str(category.total_price_chaos)))
-                    lines.append(f"- {stash_category_label(category.category_key, locale)} ~ {total_text} chaos")
+                    category_name = category_labels.get(
+                        category.category_key,
+                        stash_category_label(category.category_key, locale),
+                    )
+                    lines.append(f"- {category_name} ~ {total_text} chaos")
                 lines.append("")
             if summary.tab_totals:
+                lines.append(f"{quick_open_label}:")
+                for index, tab_total in enumerate(summary.tab_totals[:3], start=1):
+                    total_text = format_market_value(Decimal(str(tab_total.total_price_chaos)))
+                    tab_type_name = tab_type_labels.get(
+                        tab_total.tab_type,
+                        stash_tab_type_label(tab_total.tab_type, locale),
+                    )
+                    lines.append(f"- {index}) {tab_total.tab_name} ({tab_type_name}) ~ {total_text} chaos")
+                lines.append("")
                 lines.append(f"{top_tabs_label}:")
                 for tab_total in summary.tab_totals:
                     total_text = format_market_value(Decimal(str(tab_total.total_price_chaos)))
+                    tab_type_name = tab_type_labels.get(
+                        tab_total.tab_type,
+                        stash_tab_type_label(tab_total.tab_type, locale),
+                    )
                     lines.append(
-                        f"- {tab_total.tab_name} ({stash_tab_type_label(tab_total.tab_type, locale)}) ~ {total_text} chaos"
+                        f"- {tab_total.tab_name} ({tab_type_name}) ~ {total_text} chaos"
                     )
                 lines.append("")
             lines.append(f"{trm['sell']}:")
