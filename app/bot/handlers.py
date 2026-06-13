@@ -366,6 +366,7 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "sample": "Sample tabs",
             "sell": "What to sell first",
             "source": "Valuation source",
+            "liquid_estimate": "Visible liquid estimate",
             "valuation_unavailable": "Market valuation is currently unavailable. The sell-first list will appear once the pricing source is stable.",
             "liquid": "Check these first",
             "dense": "Densest tabs",
@@ -471,6 +472,10 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
                 lines.append(f"- {takeaway}")
         if summary.priced_candidates:
             lines.append("")
+            if summary.estimated_liquid_chaos is not None:
+                liquid_text = format_decimal(Decimal(str(summary.estimated_liquid_chaos)))
+                lines.append(f"{trm.get('liquid_estimate', 'Visible liquid estimate')}: ~ {liquid_text} chaos")
+                lines.append("")
             lines.append(f"{trm['sell']}:")
             for candidate in summary.priced_candidates[:6]:
                 unit_text = format_decimal(Decimal(str(candidate.unit_price_chaos)))

@@ -47,8 +47,9 @@ class PoeApiClient:
             params["id"] = change_id
         return await self._get_json(f"/public-stash-tabs/{realm}", params=params)
 
-    async def get_currency_exchange(self, league: str, realm: str = "poe2") -> dict[str, Any]:
-        return await self._get_json(f"/currency-exchange/{league}", params={"realm": realm})
+    async def get_currency_exchange(self, realm: str = "poe2", change_id: int | None = None) -> dict[str, Any]:
+        path = "/currency-exchange" if change_id is None else f"/currency-exchange/{change_id}"
+        return await self._get_json(path, params={"realm": realm})
 
     async def _get_json(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         async with httpx.AsyncClient(base_url=self.base_url, timeout=self.timeout_seconds) as client:

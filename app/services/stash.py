@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.integrations.stash_market_source import StashMarketSource
+from app.integrations.currency_market_source import CurrencyMarketSource
+from app.integrations.tracking_source import TrackingRequest
 from app.models.enums import IntegrationType
 from app.models.user import User
 from app.services.integrations import IntegrationService
@@ -39,6 +41,7 @@ class StashPanelSummary:
     live_error: str | None
     priced_candidates: tuple["PricedStashCandidate", ...]
     valuation_source: str | None
+    estimated_liquid_chaos: float | None
     statuses: tuple[StashCapabilityStatus, ...]
     next_steps: tuple[str, ...]
 
@@ -177,7 +180,7 @@ class StashService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.settings = get_settings()
-        self.market_source = StashMarketSource()
+        self.currency_market_source = CurrencyMarketSource()
 
     async def get_panel_summary(self, user: User) -> StashPanelSummary:
         integration = await IntegrationService(self.session).get_by_type(user, IntegrationType.poe_oauth)
@@ -202,11 +205,12 @@ class StashService:
         live_error: str | None = None
         priced_candidates: tuple[PricedStashCandidate, ...] = ()
         valuation_source: str | None = None
+        estimated_liquid_chaos: float | None = None
         if integration and stash_scopes_ready:
             try:
                 live_snapshot = await PoeAccountApiService(self.session).get_stash_snapshot(user)
                 if live_snapshot:
-                    priced_candidates, valuation_source = await self._build_priced_candidates(live_snapshot)
+                    priced_candidates, valuation_source, estimated_liquid_chaos = await self._build_priced_candidates(live_snapshot)
             except PoeAccountError as exc:
                 live_error = str(exc)
 
@@ -282,6 +286,7 @@ class StashService:
             live_error=live_error,
             priced_candidates=priced_candidates,
             valuation_source=valuation_source,
+            estimated_liquid_chaos=estimated_liquid_chaos,
             statuses=statuses,
             next_steps=next_steps,
         )
@@ -289,43 +294,70 @@ class StashService:
     async def _build_priced_candidates(
         self,
         snapshot: StashSnapshot,
-    ) -> tuple[tuple[PricedStashCandidate, ...], str | None]:
+    ) -> tuple[tuple[PricedStashCandidate, ...], str | None, float | None]:
         candidates: list[PricedStashCandidate] = []
         source_labels: list[str] = []
+        total_estimated = Decimal("0")
+        supported_tab_types = {"CurrencyStash", "FragmentStash"}
 
+        lookup_rows: list[tuple[str, str, int]] = []
         for tab in snapshot.tabs:
-            result = await self.market_source.get_price_index(
-                league_name=snapshot.league_name,
-                stash_type=tab.type,
+            if tab.type not in supported_tab_types:
+                continue
+            for item in tab.item_summaries:
+                lookup_rows.append((tab.name, item.name, item.quantity))
+
+        if not lookup_rows:
+            return (), None, None
+
+        price_snapshots: dict[str, tuple[Decimal, str]] = {}
+        for _, item_name, _ in lookup_rows:
+            if item_name in price_snapshots:
+                continue
+            price = await self.currency_market_source.get_price(
+                TrackingRequest(
+                    tracked_item_id=0,
+                    item_name=item_name,
+                    item_type="currency",
+                    trade_url=None,
+                    target_price=None,
+                    target_currency="chaos",
+                    league_name=snapshot.league_name,
+                    game="poe1",
+                )
             )
-            if result is None:
+            if price is None:
+                continue
+            chaos_value = price.quote_values.get("chaos") or price.market_value
+            if chaos_value is None:
+                continue
+            price_snapshots[item_name] = (chaos_value, price.source)
+
+        for tab_name, item_name, quantity in lookup_rows:
+            priced = price_snapshots.get(item_name)
+            if priced is None:
+                continue
+            unit_price, source_label = priced
+            source_labels.append(source_label)
+            total_price = unit_price * quantity
+            total_estimated += total_price
+            if total_price < 5:
                 continue
 
-            price_index, source_label = result
-            source_labels.append(source_label)
-            for item in tab.item_summaries:
-                price_entry = price_index.get(self.market_source._normalize_name(item.name))
-                if price_entry is None:
-                    continue
-
-                unit_price = price_entry.chaos_value
-                total_price = unit_price * item.quantity
-                if total_price < 5:
-                    continue
-
-                candidates.append(
-                    PricedStashCandidate(
-                        tab_name=tab.name,
-                        item_name=price_entry.name,
-                        quantity=item.quantity,
-                        unit_price_chaos=float(unit_price),
-                        total_price_chaos=float(total_price),
-                    )
+            candidates.append(
+                PricedStashCandidate(
+                    tab_name=tab_name,
+                    item_name=item_name,
+                    quantity=quantity,
+                    unit_price_chaos=float(unit_price),
+                    total_price_chaos=float(total_price),
                 )
+            )
 
         candidates.sort(key=lambda candidate: (-candidate.total_price_chaos, -candidate.unit_price_chaos, candidate.item_name))
         unique_sources = list(dict.fromkeys(source_labels))
-        return tuple(candidates[:8]), (", ".join(unique_sources) if unique_sources else None)
+        estimate = float(total_estimated) if total_estimated > 0 else None
+        return tuple(candidates[:8]), (", ".join(unique_sources) if unique_sources else None), estimate
 
     @classmethod
     def list_guides(cls) -> tuple[StashGuide, ...]:
