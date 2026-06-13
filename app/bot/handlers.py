@@ -49,6 +49,7 @@ from app.services.economy import EconomyService
 from app.services.integrations import IntegrationService
 from app.services.item_catalog import ItemCatalogService
 from app.services.leagues import LeagueService
+from app.services.poe_account import PoeAccountApiService, PoeAccountError
 from app.services.poe_oauth import PoeOAuthConfigError, PoeOAuthService
 from app.services.stats import StatsService
 from app.services.stash import StashService
@@ -138,85 +139,207 @@ def build_paused_alerts_text(items: list) -> str:
     return "\n\n".join(lines)
 
 
-def build_account_text(*, integration, oauth_config_error: str | None, locale: str = DEFAULT_LOCALE) -> str:
-    title = {"ru": "Аккаунт", "en": "Account", "fr": "Compte", "de": "Konto"}.get(locale, "Account")
-    connected = {"ru": "Статус: подключён", "en": "Status: connected", "fr": "Statut : connecté", "de": "Status: verbunden"}.get(locale, "Status: connected")
-    disconnected = {"ru": "Статус: не подключён", "en": "Status: not connected", "fr": "Statut : non connecté", "de": "Status: nicht verbunden"}.get(locale, "Status: not connected")
-    account_label = {"ru": "Аккаунт", "en": "Account", "fr": "Compte", "de": "Konto"}.get(locale, "Account")
-    oauth_unavailable = {"ru": "OAuth сейчас недоступен", "en": "OAuth is currently unavailable", "fr": "OAuth est actuellement indisponible", "de": "OAuth ist derzeit nicht verfügbar"}.get(locale, "OAuth is currently unavailable")
-    connected_hint = {"ru": "Можно обновить статус или отключить привязку ниже.", "en": "You can refresh the status or disconnect below.", "fr": "Tu peux actualiser le statut ou déconnecter le compte ci-dessous.", "de": "Du kannst unten den Status aktualisieren oder die Verbindung trennen."}.get(locale, "")
-    disconnected_hint = {"ru": "Нажми кнопку ниже, чтобы привязать аккаунт Path of Exile к Telegram.", "en": "Use the button below to connect your Path of Exile account to Telegram.", "fr": "Utilise le bouton ci-dessous pour connecter ton compte Path of Exile à Telegram.", "de": "Nutze den Button unten, um dein Path of Exile-Konto mit Telegram zu verbinden."}.get(locale, "")
-    lines = [title]
+def build_account_text(*, integration, oauth_config_error: str | None, locale: str = DEFAULT_LOCALE, snapshot=None, live_error: str | None = None) -> str:
+    copy = {
+        "ru": {
+            "title": "Аккаунт",
+            "connected": "Статус: подключён",
+            "disconnected": "Статус: не подключён",
+            "account": "Аккаунт",
+            "oauth_unavailable": "OAuth сейчас недоступен",
+            "connect_hint": "Подключи PoE-аккаунт кнопкой ниже. После этого бот сможет читать профиль, персонажей, лиги и личный тайник.",
+            "connected_hint": "Официальная привязка уже работает. Ниже можно обновить статус, сменить язык или отключить аккаунт.",
+            "profile": "Профиль",
+            "poe1_leagues": "POE1 лиги",
+            "poe1_main": "Основная лига для stash",
+            "poe1_chars": "POE1 персонажи",
+            "poe2_chars": "POE2 персонажи",
+            "live_error": "Ошибка live-данных",
+        },
+        "en": {
+            "title": "Account",
+            "connected": "Status: connected",
+            "disconnected": "Status: not connected",
+            "account": "Account",
+            "oauth_unavailable": "OAuth is currently unavailable",
+            "connect_hint": "Connect your PoE account below. After that, the bot can read your profile, characters, leagues, and personal stash.",
+            "connected_hint": "Official account linking is active. You can refresh the status, change language, or disconnect below.",
+            "profile": "Profile",
+            "poe1_leagues": "POE1 leagues",
+            "poe1_main": "Primary stash league",
+            "poe1_chars": "POE1 characters",
+            "poe2_chars": "POE2 characters",
+            "live_error": "Live data error",
+        },
+        "fr": {
+            "title": "Compte",
+            "connected": "Statut : connecté",
+            "disconnected": "Statut : non connecté",
+            "account": "Compte",
+            "oauth_unavailable": "OAuth est actuellement indisponible",
+            "connect_hint": "Connecte ton compte PoE ci-dessous. Ensuite, le bot pourra lire ton profil, tes personnages, tes ligues et ton coffre personnel.",
+            "connected_hint": "La liaison officielle est active. Tu peux actualiser le statut, changer de langue ou déconnecter le compte ci-dessous.",
+            "profile": "Profil",
+            "poe1_leagues": "Ligues POE1",
+            "poe1_main": "Ligue principale pour le coffre",
+            "poe1_chars": "Personnages POE1",
+            "poe2_chars": "Personnages POE2",
+            "live_error": "Erreur de données live",
+        },
+        "de": {
+            "title": "Konto",
+            "connected": "Status: verbunden",
+            "disconnected": "Status: nicht verbunden",
+            "account": "Konto",
+            "oauth_unavailable": "OAuth ist derzeit nicht verfügbar",
+            "connect_hint": "Verbinde unten dein PoE-Konto. Danach kann der Bot Profil, Charaktere, Ligen und den persönlichen Stash lesen.",
+            "connected_hint": "Die offizielle Verknüpfung ist aktiv. Unten kannst du den Status aktualisieren, die Sprache ändern oder die Verbindung trennen.",
+            "profile": "Profil",
+            "poe1_leagues": "POE1-Ligen",
+            "poe1_main": "Primäre Stash-Liga",
+            "poe1_chars": "POE1-Charaktere",
+            "poe2_chars": "POE2-Charaktere",
+            "live_error": "Live-Datenfehler",
+        },
+    }
+    trm = copy.get(locale, copy["en"])
+    lines = [trm["title"]]
     if integration:
-        lines.append(connected)
+        lines.append(trm["connected"])
         if integration.external_account_name:
-            lines.append(f"{account_label}: {integration.external_account_name}")
+            lines.append(f"{trm['account']}: {integration.external_account_name}")
         if integration.scopes:
             lines.append(f"Scopes: {integration.scopes}")
     else:
-        lines.append(disconnected)
+        lines.append(trm["disconnected"])
+
+    if snapshot:
+        lines.append("")
+        if snapshot.profile_name:
+            lines.append(f"{trm['profile']}: {snapshot.profile_name}")
+        lines.append(f"{trm['poe1_leagues']}: {len(snapshot.poe1_leagues)}")
+        if snapshot.poe1_primary_league:
+            lines.append(f"{trm['poe1_main']}: {snapshot.poe1_primary_league}")
+        lines.append(f"{trm['poe1_chars']}: {snapshot.poe1_character_count}")
+        lines.append(f"{trm['poe2_chars']}: {snapshot.poe2_character_count}")
 
     if oauth_config_error:
         lines.append("")
-        lines.append(f"{oauth_unavailable}: {oauth_config_error}")
+        lines.append(f"{trm['oauth_unavailable']}: {oauth_config_error}")
+    elif live_error:
+        lines.append("")
+        lines.append(f"{trm['live_error']}: {live_error}")
     elif integration:
         lines.append("")
-        lines.append(connected_hint)
+        lines.append(trm["connected_hint"])
     else:
         lines.append("")
-        lines.append(disconnected_hint)
+        lines.append(trm["connect_hint"])
 
     return "\n".join(lines)
 
 
 def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
-    title = {"ru": "Тайник", "en": "Stash", "fr": "Coffre", "de": "Stash"}.get(locale, "Stash")
-    account_connected = {"ru": "PoE аккаунт: подключён", "en": "PoE account: connected", "fr": "Compte PoE : connecté", "de": "PoE-Konto: verbunden"}.get(locale, "PoE account: connected")
-    account_not_connected = {"ru": "PoE аккаунт: пока не подключён", "en": "PoE account: not connected yet", "fr": "Compte PoE : pas encore connecté", "de": "PoE-Konto: noch nicht verbunden"}.get(locale, "PoE account: not connected yet")
-    blocker_label = {"ru": "Блокер OAuth", "en": "OAuth blocker", "fr": "Blocage OAuth", "de": "OAuth-Blocker"}.get(locale, "OAuth blocker")
-    readiness = {"ru": "Статус готовности:", "en": "Readiness status:", "fr": "État de préparation :", "de": "Bereitschaftsstatus:"}.get(locale, "Readiness status:")
-    upcoming = {"ru": "Что здесь появится:", "en": "What will appear here:", "fr": "Ce qui apparaîtra ici :", "de": "Was hier erscheinen wird:"}.get(locale, "What will appear here:")
-    next_steps = {"ru": "Следующие шаги:", "en": "Next steps:", "fr": "Étapes suivantes :", "de": "Nächste Schritte:"}.get(locale, "Next steps:")
-    footer = {
-        "ru": "Phase 6 уже начата: UX и сервисный фундамент готовы, дальше нам нужны account-data и stash-scopes.",
-        "en": "Phase 6 has already started: the UX and service foundation are ready, and the next step needs account data and stash scopes.",
-        "fr": "La phase 6 a déjà commencé : l'UX et la base de services sont prêtes, et la suite dépend des données de compte et des scopes de coffre.",
-        "de": "Phase 6 hat bereits begonnen: UX und Service-Fundament stehen, und als Nächstes brauchen wir Account-Daten und Stash-Scopes.",
-    }.get(locale, "")
-    lines = [title, ""]
+    copy = {
+        "ru": {
+            "title": "Тайник",
+            "connected": "PoE аккаунт: подключён",
+            "not_connected": "PoE аккаунт: пока не подключён",
+            "blocker": "OAuth blocker",
+            "status": "Статус:",
+            "live": "Live stash snapshot:",
+            "tabs": "вкладок",
+            "folders": "папок",
+            "special": "спец-вкладок",
+            "sample": "Примеры вкладок",
+            "next_steps": "Следующие шаги:",
+            "footer": "Phase 6 теперь активна: официальный OAuth получен, и дальше мы переводим тайник из read-only readiness в реальный личный stash assistant.",
+        },
+        "en": {
+            "title": "Stash",
+            "connected": "PoE account: connected",
+            "not_connected": "PoE account: not connected yet",
+            "blocker": "OAuth blocker",
+            "status": "Status:",
+            "live": "Live stash snapshot:",
+            "tabs": "tabs",
+            "folders": "folders",
+            "special": "special tabs",
+            "sample": "Sample tabs",
+            "next_steps": "Next steps:",
+            "footer": "Phase 6 is now active: official OAuth is in place, and the next move is to turn stash readiness into a real personal stash assistant.",
+        },
+        "fr": {
+            "title": "Coffre",
+            "connected": "Compte PoE : connecté",
+            "not_connected": "Compte PoE : pas encore connecté",
+            "blocker": "Blocage OAuth",
+            "status": "Statut :",
+            "live": "Snapshot live du coffre :",
+            "tabs": "onglets",
+            "folders": "dossiers",
+            "special": "onglets spéciaux",
+            "sample": "Exemples d'onglets",
+            "next_steps": "Étapes suivantes :",
+            "footer": "La phase 6 est maintenant active : l'OAuth officiel est obtenu, et la suite consiste à transformer ce panneau en véritable assistant de coffre personnel.",
+        },
+        "de": {
+            "title": "Stash",
+            "connected": "PoE-Konto: verbunden",
+            "not_connected": "PoE-Konto: noch nicht verbunden",
+            "blocker": "OAuth-Blocker",
+            "status": "Status:",
+            "live": "Live-Stash-Snapshot:",
+            "tabs": "Tabs",
+            "folders": "Ordner",
+            "special": "Spezial-Tabs",
+            "sample": "Beispiel-Tabs",
+            "next_steps": "Nächste Schritte:",
+            "footer": "Phase 6 ist jetzt aktiv: offizielles OAuth ist da, und als Nächstes bauen wir daraus einen echten persönlichen Stash-Assistenten.",
+        },
+    }
+    trm = copy.get(locale, copy["en"])
+    lines = [trm["title"], ""]
 
     if summary.account_connected:
         if summary.account_name:
-            lines.append(f"{account_connected} ({summary.account_name})")
+            lines.append(f"{trm['connected']} ({summary.account_name})")
         else:
-            lines.append(account_connected)
+            lines.append(trm["connected"])
     else:
-        lines.append(account_not_connected)
+        lines.append(trm["not_connected"])
 
     if summary.approved_scopes:
         lines.append(f"Scopes: {' '.join(summary.approved_scopes)}")
-
     if summary.oauth_blocker:
-        lines.append(f"{blocker_label}: {summary.oauth_blocker}")
+        lines.append(f"{trm['blocker']}: {summary.oauth_blocker}")
 
     lines.append("")
-    lines.append(readiness)
+    lines.append(trm["status"])
     for item in summary.statuses:
         lines.append(f"- {item.title}: {item.status}")
         lines.append(f"  {item.detail}")
 
-    lines.append("")
-    lines.append(upcoming)
-    for insight in summary.upcoming_insights:
-        lines.append(f"- {insight}")
+    if summary.live_snapshot:
+        live = summary.live_snapshot
+        lines.append("")
+        lines.append(f"{trm['live']} {live.league_name}")
+        lines.append(f"- {live.total_tabs} {trm['tabs']}")
+        lines.append(f"- {live.folder_tabs} {trm['folders']}")
+        lines.append(f"- {live.special_tabs} {trm['special']}")
+        if live.sample_tabs:
+            lines.append(f"- {trm['sample']}: {', '.join(live.sample_tabs)}")
+    elif summary.live_error:
+        lines.append("")
+        lines.append(f"{trm['live']} {summary.live_error}")
 
     lines.append("")
-    lines.append(next_steps)
+    lines.append(trm["next_steps"])
     for step in summary.next_steps:
         lines.append(f"- {step}")
 
     lines.append("")
-    lines.append(footer)
+    lines.append(trm["footer"])
     return "\n".join(lines)
 
 
@@ -817,10 +940,17 @@ async def finish_wizard(
 
 
 async def load_account_panel(telegram_id: int, username: str | None, telegram_locale: str | None = None) -> tuple[str, object]:
+    snapshot = None
+    live_error: str | None = None
     async with session_scope() as session:
         user = await ensure_user(session, telegram_id, username)
         integration = await IntegrationService(session).get_by_type(user, IntegrationType.poe_oauth)
         locale = normalize_locale(user.language or telegram_locale or DEFAULT_LOCALE)
+        if integration:
+            try:
+                snapshot = await PoeAccountApiService(session).get_account_snapshot(user)
+            except PoeAccountError as exc:
+                live_error = str(exc)
 
     oauth_service = PoeOAuthService()
     connect_url: str | None = None
@@ -830,7 +960,13 @@ async def load_account_panel(telegram_id: int, username: str | None, telegram_lo
     except PoeOAuthConfigError as exc:
         oauth_config_error = str(exc)
 
-    text = build_account_text(integration=integration, oauth_config_error=oauth_config_error, locale=locale)
+    text = build_account_text(
+        integration=integration,
+        oauth_config_error=oauth_config_error,
+        locale=locale,
+        snapshot=snapshot,
+        live_error=live_error,
+    )
     keyboard = account_keyboard(connect_url=connect_url, is_connected=integration is not None, locale=locale)
     return text, keyboard
 

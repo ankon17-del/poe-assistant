@@ -22,13 +22,13 @@ def _render_callback_page(
     accent = "#16a34a" if success else "#dc2626"
     details = ""
     if account_name:
-        details += f"<p><strong>Аккаунт:</strong> {account_name}</p>"
+        details += f"<p><strong>Account:</strong> {account_name}</p>"
     if scopes:
         details += f"<p><strong>Scopes:</strong> {scopes}</p>"
 
     html = f"""
     <!doctype html>
-    <html lang="ru">
+    <html lang="en">
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -73,7 +73,7 @@ def _render_callback_page(
           <h1>{title}</h1>
           <p>{message}</p>
           {details}
-          <p class="muted">Теперь можно вернуться в Telegram и открыть /account или /settings.</p>
+          <p class="muted">You can now return to Telegram and open /account or /settings.</p>
         </div>
       </body>
     </html>
@@ -126,8 +126,8 @@ async def poe_oauth_callback(code: str, state: str) -> HTMLResponse:
     state_item = oauth_state_store.pop(state)
     if state_item is None:
         return _render_callback_page(
-            title="OAuth state истёк",
-            message="Состояние авторизации не найдено или уже устарело. Запусти привязку аккаунта ещё раз из Telegram.",
+            title="OAuth state expired",
+            message="The authorization state was not found or has already expired. Please start the account linking flow again from Telegram.",
             success=False,
         )
 
@@ -140,14 +140,14 @@ async def poe_oauth_callback(code: str, state: str) -> HTMLResponse:
         )
     except PoeOAuthConfigError as exc:
         return _render_callback_page(
-            title="OAuth не настроен",
+            title="OAuth is not configured",
             message=str(exc),
             success=False,
         )
     except Exception as exc:
         return _render_callback_page(
-            title="Не удалось завершить привязку",
-            message=f"Обмен кода на токен не удался: {exc}",
+            title="Could not finish account linking",
+            message=f"Authorization code exchange failed: {exc}",
             success=False,
         )
 
@@ -168,8 +168,8 @@ async def poe_oauth_callback(code: str, state: str) -> HTMLResponse:
         )
 
     return _render_callback_page(
-        title="PoE аккаунт подключён",
-        message="Привязка прошла успешно. Бот теперь может использовать одобренные account scopes.",
+        title="PoE account connected",
+        message="Account linking completed successfully. The bot can now use the approved account scopes.",
         success=True,
         account_name=token.username or "",
         scopes=token.scope or "",

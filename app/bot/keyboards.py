@@ -171,7 +171,7 @@ def paused_alerts_keyboard(items: list[TrackedItem], locale: str = "ru") -> Inli
 
 def account_keyboard(connect_url: str | None, is_connected: bool, locale: str = "ru") -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
-    if connect_url:
+    if connect_url and not is_connected:
         rows.append([InlineKeyboardButton(text=tr(locale, "connect_account"), url=connect_url)])
     rows.append([InlineKeyboardButton(text=tr(locale, "refresh_status"), callback_data="account:refresh")])
     if is_connected:
