@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+import logging
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -29,6 +30,12 @@ class PoeAccountScopeError(PoeAccountError):
 
 class PoeAccountApiError(PoeAccountError):
     pass
+
+
+class PoeAccountRateLimitError(PoeAccountApiError):
+    def __init__(self, message: str, retry_after_seconds: int | None = None):
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
 
 
 @dataclass(frozen=True)
@@ -76,9 +83,16 @@ class StashSnapshot:
     dense_tabs: tuple[StashTabOverview, ...]
     dump_tabs: tuple[StashTabOverview, ...]
     tabs: tuple[StashTabOverview, ...]
+    failed_tabs: int = 0
+    is_partial: bool = False
+    is_cached: bool = False
 
 
 class PoeAccountApiService:
+    _logger = logging.getLogger(__name__)
+    _snapshot_cache_ttl = timedelta(seconds=45)
+    _detail_fetch_concurrency = 2
+    _snapshot_cache: dict[tuple[int, str], tuple[datetime, StashSnapshot]] = {}
     _special_type_labels = {
         "CurrencyStash": "Currency",
         "FragmentStash": "Fragments",
@@ -148,6 +162,10 @@ class PoeAccountApiService:
         if not selected_league:
             raise PoeAccountApiError("No PoE1 league is available for stash access.")
 
+        cached_snapshot = self._get_cached_snapshot(user.id, selected_league)
+        if cached_snapshot is not None:
+            return cached_snapshot
+
         stashes_payload = await self._authorized_get_json(user, integration, f"/stash/{selected_league}")
         listed_stashes = stashes_payload.get("stashes", [])
         if not isinstance(listed_stashes, list):
@@ -164,20 +182,35 @@ class PoeAccountApiService:
         )
 
         leaf_tabs = [stash for stash in listed_stashes if not self._is_folder_tab(stash)]
-        detail_payloads = await asyncio.gather(
-            *(self._fetch_stash_detail(user, integration, selected_league, stash) for stash in leaf_tabs),
+        semaphore = asyncio.Semaphore(self._detail_fetch_concurrency)
+        detail_results = await asyncio.gather(
+            *(
+                self._load_tab_overview(
+                    user=user,
+                    integration=integration,
+                    league_name=selected_league,
+                    listed_stash=stash,
+                    semaphore=semaphore,
+                )
+                for stash in leaf_tabs
+            ),
             return_exceptions=True,
         )
 
         tab_overviews: list[StashTabOverview] = []
-        for listed_stash, detail in zip(leaf_tabs, detail_payloads):
-            if isinstance(detail, Exception):
-                overview = self._build_tab_overview_from_listing(listed_stash, ())
-            else:
-                stash_payload = detail.get("stash") if isinstance(detail, dict) and "stash" in detail else detail
-                items = stash_payload.get("items", []) if isinstance(stash_payload, dict) else []
-                overview = self._build_tab_overview_from_listing(listed_stash, items)
-            tab_overviews.append(overview)
+        failed_tabs = 0
+        for listed_stash, result in zip(leaf_tabs, detail_results):
+            if isinstance(result, Exception):
+                failed_tabs += 1
+                self._logger.warning(
+                    "Failed to load stash tab detail league=%s tab=%s error=%s",
+                    selected_league,
+                    self._normalize_tab_name(listed_stash),
+                    result,
+                )
+                tab_overviews.append(self._build_tab_overview_from_listing(listed_stash, ()))
+                continue
+            tab_overviews.append(result)
 
         special_tabs = sum(1 for tab in tab_overviews if tab.is_special)
         empty_tabs = sum(1 for tab in tab_overviews if tab.item_count == 0)
@@ -206,7 +239,7 @@ class PoeAccountApiService:
             )[:4]
         )
 
-        return StashSnapshot(
+        snapshot = StashSnapshot(
             league_name=selected_league,
             total_tabs=len(tab_overviews),
             folder_tabs=folder_tabs,
@@ -218,7 +251,16 @@ class PoeAccountApiService:
             dense_tabs=dense_tabs,
             dump_tabs=dump_tabs,
             tabs=tuple(tab_overviews),
+            failed_tabs=failed_tabs,
+            is_partial=failed_tabs > 0,
         )
+        if failed_tabs > 0 and cached_snapshot is not None:
+            return replace(cached_snapshot, is_cached=True)
+
+        if failed_tabs == 0:
+            self._store_cached_snapshot(user.id, selected_league, snapshot)
+
+        return snapshot
 
     async def _authorized_get_json(self, user: User, integration, path: str) -> dict[str, Any]:
         token = await self._ensure_access_token(user, integration)
@@ -257,6 +299,13 @@ class PoeAccountApiService:
             )
         if response.status_code == 403:
             raise PoeAccountScopeError(f"PoE API rejected {path} with 403. The connected token likely lacks a required scope.")
+        if response.status_code == 429:
+            retry_after = response.headers.get("retry-after")
+            retry_after_seconds = int(retry_after) if retry_after and retry_after.isdigit() else None
+            raise PoeAccountRateLimitError(
+                f"PoE API rate-limited {path} with HTTP 429.",
+                retry_after_seconds=retry_after_seconds,
+            )
         if response.status_code not in (200, 401):
             raise PoeAccountApiError(f"PoE API request failed for {path}: HTTP {response.status_code}")
         return response
@@ -314,6 +363,34 @@ class PoeAccountApiService:
         else:
             path = f"/stash/{league_name}/{stash_id}"
         return await self._authorized_get_json(user, integration, path)
+
+    async def _load_tab_overview(
+        self,
+        *,
+        user: User,
+        integration,
+        league_name: str,
+        listed_stash: dict[str, Any],
+        semaphore: asyncio.Semaphore,
+    ) -> StashTabOverview:
+        async with semaphore:
+            last_error: Exception | None = None
+            for attempt in range(3):
+                try:
+                    detail = await self._fetch_stash_detail(user, integration, league_name, listed_stash)
+                    stash_payload = detail.get("stash") if isinstance(detail, dict) and "stash" in detail else detail
+                    items = stash_payload.get("items", []) if isinstance(stash_payload, dict) else []
+                    return self._build_tab_overview_from_listing(listed_stash, items)
+                except PoeAccountRateLimitError as exc:
+                    last_error = exc
+                    if attempt == 2:
+                        break
+                    delay_seconds = exc.retry_after_seconds or (attempt + 1)
+                    await asyncio.sleep(max(delay_seconds, 1))
+                except PoeAccountApiError as exc:
+                    last_error = exc
+                    break
+            raise last_error or PoeAccountApiError("Unknown stash detail loading error.")
 
     def _build_tab_overview_from_listing(
         self,
@@ -449,3 +526,21 @@ class PoeAccountApiService:
             return softcore_non_ruthless[0]
 
         return leagues[0]
+
+    @classmethod
+    def _get_cached_snapshot(cls, user_id: int, league_name: str) -> StashSnapshot | None:
+        cache_key = (user_id, league_name)
+        cached = cls._snapshot_cache.get(cache_key)
+        if cached is None:
+            return None
+
+        cached_at, snapshot = cached
+        if datetime.now(UTC) - cached_at > cls._snapshot_cache_ttl:
+            cls._snapshot_cache.pop(cache_key, None)
+            return None
+
+        return replace(snapshot, is_cached=True)
+
+    @classmethod
+    def _store_cached_snapshot(cls, user_id: int, league_name: str, snapshot: StashSnapshot) -> None:
+        cls._snapshot_cache[(user_id, league_name)] = (datetime.now(UTC), snapshot)

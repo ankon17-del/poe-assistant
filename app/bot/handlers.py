@@ -338,13 +338,16 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "empty": "пустых вкладок",
             "items": "предметов в просмотренных вкладках",
             "sample": "Примеры вкладок",
-            "takeaways": "What to do first",
-            "sell": "What to sell first",
-            "source": "Valuation source",
+            "takeaways": "Что делать первым",
+            "sell": "Что можно продать первым",
+            "source": "Источник оценки",
+            "valuation_unavailable": "Оценка рыночной стоимости сейчас недоступна. Список sell-first появится после стабилизации источника цен.",
             "liquid": "Что проверить первым",
             "dense": "Самые плотные вкладки",
             "dump": "Что похоже на dump-разбор",
             "next_steps": "Следующие шаги:",
+            "cached": "Показан недавний кэшированный снимок, чтобы не упираться в лимиты PoE API.",
+            "partial": "Часть вкладок не успела обновиться: {count}. Данные могут быть неполными.",
             "footer": "Phase 6 теперь активна: официальный OAuth получен, и дальше мы переводим тайник из read-only readiness в реальный личный stash assistant.",
         },
         "en": {
@@ -363,10 +366,13 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "sample": "Sample tabs",
             "sell": "What to sell first",
             "source": "Valuation source",
+            "valuation_unavailable": "Market valuation is currently unavailable. The sell-first list will appear once the pricing source is stable.",
             "liquid": "Check these first",
             "dense": "Densest tabs",
             "dump": "Likely dump tabs",
             "next_steps": "Next steps:",
+            "cached": "Showing a recent cached snapshot to avoid hitting the PoE API rate limit.",
+            "partial": "{count} tabs could not be refreshed in time. This snapshot may be incomplete.",
             "footer": "Phase 6 is now active: official OAuth is in place, and the next move is to turn stash readiness into a real personal stash assistant.",
         },
         "fr": {
@@ -383,12 +389,15 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "items": "objets dans les onglets analysés",
             "takeaways": "Par quoi commencer",
             "sample": "Exemples d'onglets",
-            "sell": "? vendre en premier",
+            "sell": "À vendre en premier",
             "source": "Source d'estimation",
+            "valuation_unavailable": "L'estimation du marché est indisponible pour le moment. La liste de vente prioritaire apparaîtra dès que la source de prix sera stable.",
             "liquid": "À vérifier en premier",
             "dense": "Onglets les plus chargés",
             "dump": "Onglets à trier",
             "next_steps": "Étapes suivantes :",
+            "cached": "Affichage d'un snapshot récent mis en cache pour éviter la limite de l'API PoE.",
+            "partial": "{count} onglets n'ont pas pu être actualisés à temps. Le snapshot peut être incomplet.",
             "footer": "La phase 6 est maintenant active : l'OAuth officiel est obtenu, et la suite consiste à transformer ce panneau en véritable assistant de coffre personnel.",
         },
         "de": {
@@ -407,10 +416,13 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             "sample": "Beispiel-Tabs",
             "sell": "Das zuerst verkaufen",
             "source": "Bewertungsquelle",
+            "valuation_unavailable": "Die Marktbewertung ist derzeit nicht verfügbar. Die Sell-first-Liste erscheint, sobald die Preisquelle stabil ist.",
             "liquid": "Das zuerst prüfen",
             "dense": "Dichteste Tabs",
             "dump": "Tabs zum Aussortieren",
             "next_steps": "Nächste Schritte:",
+            "cached": "Es wird ein aktueller Cache-Snapshot angezeigt, damit wir nicht ins PoE-API-Limit laufen.",
+            "partial": "{count} Tabs konnten nicht rechtzeitig aktualisiert werden. Dieser Snapshot kann unvollständig sein.",
             "footer": "Phase 6 ist jetzt aktiv: offizielles OAuth ist da, und als Nächstes bauen wir daraus einen echten persönlichen Stash-Assistenten.",
         },
     }
@@ -445,6 +457,10 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
         lines.append(f"- {live.special_tabs} {trm['special']}")
         lines.append(f"- {live.empty_tabs} {trm['empty']}")
         lines.append(f"- {live.total_items} {trm['items']}")
+        if live.is_cached:
+            lines.append(f"- {trm['cached']}")
+        elif live.is_partial:
+            lines.append(f"- {trm['partial'].format(count=live.failed_tabs)}")
         if live.sample_tabs:
             lines.append(f"- {trm['sample']}: {', '.join(live.sample_tabs)}")
         takeaways = _build_stash_takeaways(live, locale)
@@ -464,6 +480,9 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
                 )
             if summary.valuation_source:
                 lines.append(f"- {trm['source']}: {summary.valuation_source}")
+        elif live.total_items > 0:
+            lines.append("")
+            lines.append(trm["valuation_unavailable"])
         if live.liquid_tabs:
             lines.append("")
             lines.append(f"{trm['liquid']}:")

@@ -1,419 +1,293 @@
-# POE / POE2 Telegram Assistant - Roadmap V2
+# POE Assistant Roadmap V2
 
-## Update 2026-06-13
+## Актуально на 2026-06-13
 
-Текущий главный вектор проекта смещён из режима "готовим OAuth/stash foundation" в режим
-"строим полезный personal stash assistant на официальных account scopes".
+Это уже не просто бот с парой команд. Текущий вектор проекта:
 
-### Актуальный приоритет по фазам
+- единый Telegram-хаб для игрока POE 1 / POE 2
+- официальный OAuth уже работает
+- аккаунт и stash уже читаются с официального API
+- теперь главный вопрос не "как подключить", а "как превратить это в реально полезного ассистента"
 
-- Phase 1: готово
-- Phase 2: частично готово, currency-case живой, item trade polling всё ещё ограничен внешним 403
-- Phase 3: сильно готово
-- Phase 4: хорошо для POE2, частично для POE1
-- Phase 5: сильный foundation уже собран
-- Phase 6: активная рабочая фаза прямо сейчас
-- Phase 7: отложена
-- Phase 8-10: вторичный приоритет, пока не добьём полезность stash/account слоя
-
-### Phase 6 - текущий milestone
-
-1. official OAuth уже работает
-2. account linking уже работает
-3. live PoE1 stash-read уже работает
-4. теперь цель — превратить `/stash` в полезный экран:
-   - liquid tabs
-   - dense tabs
-   - dump candidates
-   - what to check first
-   - дальше hidden liquidity и sell-first hints
-
-### Ближайший маршрут
-
-1. Дожать stash assistant v1 до реально полезного summary
-2. Добавить вторую волну stash-insights по ликвидности и приоритету продажи
-3. После этого переходить к account-aware recommendations и расширению экономического слоя
-
-Актуализировано по фактическому состоянию репозитория и Railway-деплоя на `2026-05-12`.
-
-## 1. Где мы сейчас
-
-Проект уже не на стадии "скелета". У нас есть живой Telegram-бот, отдельный API, отдельный worker, рабочий economy-контур для POE2, развитый template-flow, build assistant и начатая Phase 6 для stash-analysis.
-
-При этом важно честно разделять:
-
-- что уже реально полезно пользователю каждый день;
-- что собрано как foundation и готово к наращиванию;
-- что упирается во внешние ограничения (`GGG OAuth`, `PoE trade 403`, отсутствие stash-scopes).
-
-Сейчас проект лучше всего описывается так:
-
-- **Foundation собран хорошо**
-- **MVP уже живой для currency / economy / templates / builds**
-- **item trade tracking и real stash-analysis ещё не доведены до production-ready**
+Ниже честная карта: что уже готово, что сломано, что частично, и куда идем дальше.
 
 ---
 
-## 2. Статус по фазам
+## 1. Быстрый аудит
 
-### Phase 1 - Project Foundation
-**Статус: практически завершена**
+### Уже живое и полезное
 
-Сделано:
+- OAuth-привязка PoE-аккаунта
+- account panel внутри Telegram
+- currency/economy контур
+- price alerts
+- template flows
+- build assistant
+- мультиязычное меню и навигация
+- live read личного stash для PoE 1 через `account:stashes`
 
-- разделение на `api / bot / services / integrations / workers / models / db`
-- `FastAPI` сервис
-- `aiogram 3` бот
-- конфиг через `.env`
-- логирование
-- async SQLAlchemy + Alembic
-- healthchecks для Railway
-- split-деплой:
-  - `poe-assistant`
-  - `poe-assistant-bot`
-  - `poe-assistant-worker`
-- `Postgres` и `Redis` подключены
+### Уже есть как foundation, но пользы пока мало
 
-Остаточный хвост:
+- stash panel
+- stash tab summary
+- character/account context
+- language settings
+- groundwork для wealth / valuation / account-aware advice
 
-- полноценный production docker-compose / container workflow
-- отдельная очередь уровня `Celery/RQ` пока не внедрена
+### Что сейчас реально ломает пользу
 
-Итог:
-
-- **Phase 1 можно считать закрытой для текущего продукта**
-
----
-
-### Phase 2 - Trade Tracking System
-**Статус: частично завершена**
-
-Сделано:
-
-- `tracked_items`
-- worker polling loop
-- source registry
-- currency watcher pipeline
-- inline-управление watcher'ами
-- `/add`, `/list`, `/alerts`, `/stats`
-- переактивация сработавших alerts
-- массовые действия по alerts
-- worker observability стала лучше
-
-Работает хорошо:
-
-- currency alerts
-- worker cycle
-- dedupe / paused / reactivate flow
-
-Не закрыто:
-
-- real item trade URL watcher в production
-- ordinary item market polling
-- real sale notifications по настоящим trade-sales
-
-Ключевой блокер:
-
-- `pathofexile.com` режет Railway worker по `403 Forbidden` на website trade flow
-
-Итог:
-
-- **Phase 2 закрыта для currency-кейса**
-- **Phase 2 не закрыта для обычных item watchers**
+1. `/stash` иногда показывает пустые вкладки или ноль предметов из-за rate limit `429` от официального PoE API.
+2. Stash valuation слой пока ненадежен: текущий источник для tab-level pricing бьется в `404`, поэтому блок "что продать" неустойчив.
+3. Обычный item trade tracking по shared trade URLs все еще страдает от внешних ограничений `403` со стороны trade сайта.
+4. Продвинутый account intelligence еще не построен:
+   - wealth tracker
+   - dead currency detector
+   - character analytics
+   - atlas/build advisor
 
 ---
 
-### Phase 3 - Template System
-**Статус: хорошо продвинута, почти готова для MVP**
+## 2. Стадии продукта
 
-Сделано:
+### Stage 1. Core Assistant
+Статус: в основном готово
 
-- `template_groups`
-- `template_items`
-- seed-логика
-- realm-aware шаблоны
-- выбор игры перед шаблонами
-- фильтрация шаблонов по игре
-- preview перед активацией
-- выбор лиги перед применением
-- отчёт:
-  - что создано
-  - что реактивировано / обновлено
-- отдельные POE1/POE2 template packs
-- target currency внутри template items
+- OAuth
+- trade / currency tracking foundation
+- price alerts
+- economy snapshots
+- Telegram-native menu / flows
 
-Итог:
+Что еще добить:
 
-- **Phase 3 можно считать достаточно зрелой для MVP**
+- item watchers вне currency-case
+- более надежный sale / market event слой
 
-Что можно докрутить потом:
+### Stage 2. Stash Analytics
+Статус: активная рабочая фаза
 
-- community templates
-- import / export
-- template versioning UX
+Цель этой стадии:
+
+- показать не просто содержимое тайника
+- а ответить на вопросы:
+  - где лежат деньги
+  - что продавать первым
+  - какая валюта залежалась
+  - какие вкладки самые плотные
+  - где мусор, а где ликвидность
+
+Подстадии:
+
+1. Trustworthy stash snapshot
+2. Sell-first candidates
+3. Wealth summary by category
+4. Dead currency detector
+5. History / wealth tracker
+
+### Stage 3. Character Intelligence
+Статус: еще не начато по-настоящему
+
+- character dashboard
+- build health checks
+- gear gap hints
+- atlas-aware recommendations
+
+### Stage 4. Full AI POE Assistant
+Статус: дальняя, но уже логичная цель
+
+Идеальный сценарий:
+
+Пользователь пишет в Telegram:
+
+> Что мне сейчас выгоднее фармить?
+
+А бот отвечает, опираясь на:
+
+- текущую лигу
+- его stash
+- его валюту
+- его персонажей
+- его билд
+- его atlas / прогресс
+- текущую экономику
 
 ---
 
-### Phase 4 - Economy System
-**Статус: живая и полезная, но не полностью закрыта**
+## 3. Честный статус по направлениям
 
-Сделано:
+### Trade Tracking
+Статус: частично готово
+
+Готово:
+
+- currency watchers
+- thresholds
+- alerts lifecycle
+- worker loop
+
+Проблемы:
+
+- item trade URL polling нестабилен из-за внешних `403`
+
+### Economy
+Статус: рабочее
+
+Готово:
 
 - `/economy`
-- POE2 currency snapshots
-- overview summary
-- top watched currencies
-- nearest alerts
-- paused alerts visibility
-- market movement summary
-- market pulse
-- actionable hints
-- связка `/economy <-> /alerts <-> /stats`
-
-Работает хорошо:
-
-- POE2 economy loop
-- currency market awareness
-- operational обзор по watcher'ам
-
-Частично работает:
-
-- POE1 league awareness и fallback-логика есть
-- `Mirage` поддержан как лига
-- но POE1 external rate sources по-прежнему нестабильны / пусты в текущем окружении
-
-Итог:
+- currency alerts summary
+- активные / paused alerts
+- POE2 economy layer
 
-- **Phase 4 закрыта для POE2 MVP-контура**
-- **Phase 4 частично закрыта для POE1**
+Проблемы:
 
----
+- часть POE1 источников все еще нестабильна
 
-### Phase 5 - Build Assistant
-**Статус: уверенно начата и уже полезна**
+### Templates
+Статус: рабочее
 
-Сделано:
+Готово:
 
-- `/builds`
-- flow:
-  - игра
-  - цель
-  - бюджет
-  - стиль
-  - список билдов
-  - detail-card
-- verdict summary
-- alternatives
-- upgrade guidance
-- endgame focus
-- slot checklist
-- gear sheet
-- progression stages
-- trade targets
-- content warnings
-- внешние кнопки:
-  - `Planner`
-  - `Guide`
-  - `Tree`
-  - `Atlas`
-- browse-flow с `Назад`
-- source-backed flagship builds
-- остальные билды тоже приведены к рабочему уровню с external entry points и внутренними блоками
+- game-aware templates
+- goal-based template selection
+- activation flow
 
-Что уже даёт ценность:
+### Builds
+Статус: рабочее, но еще не финальный уровень
 
-- не просто "текст о билде"
-- а старт build research прямо из Telegram
-- с market-facing подсказками и внешними visual refs
+Готово:
 
-Что ещё не закрыто:
+- build browse flow
+- detailed cards
+- planner / guide / tree / atlas links
 
-- gem setup / links
-- более точные curated sources для всех билдов, а не только части
-- реально visual-native build surfaces внутри продукта (пока это внешние planner / guide / atlas links)
+Еще нужно:
 
-Итог:
+- глубже связать билды с аккаунтом, stash и market reality
 
-- **Phase 5 собрана как сильный foundation**
-- **Phase 5 достаточно зрелая, чтобы двигаться дальше**
+### Account
+Статус: готово как foundation
 
----
+Готово:
 
-### Phase 6 - Stash Analysis
-**Статус: начата**
+- OAuth
+- scopes
+- account panel
+- league / character context
 
-Сделано:
+### Stash
+Статус: не хватает product value
 
-- `/stash`
-- stash readiness panel
-- статус:
-  - аккаунта
-  - OAuth/scopes
-  - готовности к live stash read
-- ручные stash playbooks:
-  - быстрый stash triage
-  - что продавать быстрее всего
-  - как проверять unique tabs
-  - как смотреть currency / fragments
+Готово:
 
-Что это значит:
-
-- реального stash-scan ещё нет
-- но UX, framing и ручная практическая польза уже появились
-
-Что нужно, чтобы Phase 6 стала "настоящей":
-
-- рабочий PoE account OAuth с нужными scopes
-- доступ к stash/account data
-- реальные сервисы чтения вкладок
-- автоматические insights вместо только manual playbooks
-
-Итог:
-
-- **Phase 6 начата, но пока это foundation + manual layer**
-
----
-
-### Phase 7 - FunPay Integration
-**Статус: не начата**
-
----
-
-### Phase 8 - Advanced Template System
-**Статус: не начата**
-
----
-
-### Phase 9 - Telegram Mini App
-**Статус: не начата**
-
----
-
-## 3. Что готово полностью или почти полностью
-
-Можно считать собранными или почти собранными:
-
-- **Phase 1**
-- **Phase 3**
-- **POE2-часть Phase 4**
-
-Можно считать рабочими, но не завершёнными:
-
-- **Phase 2**
-- **Phase 5**
-- **Phase 6**
-
-Пока не начаты:
-
-- **Phase 7**
-- **Phase 8**
-- **Phase 9**
-
----
-
-## 4. Главные незакрытые блоки проекта
-
-Это самые важные реальные gaps сейчас:
-
-1. **Real item tracking**
-   - ordinary item watchers
-   - production-grade trade URL polling
-
-2. **POE1 data quality**
-   - currency/economy sources по-прежнему нестабильны
-
-3. **OAuth / account scopes**
-   - код готов
-   - но нет подтверждённых client credentials и stash-scopes от GGG
-
-4. **Real stash analysis**
-   - пока только foundation и manual playbooks
-
-5. **Phase 7+**
-   - FunPay
-   - advanced templates
-   - mini app
-
----
-
-## 5. Текущий рабочий план
-
-Сейчас оптимальный порядок такой:
-
-### Текущий активный этап
-**Продолжать Phase 6**
-
-Ближайший правильный шаг:
-
-1. усилить manual stash-audit flow
-2. сделать более структурированные stash сценарии:
-   - currency tab audit
-   - unique tab audit
-   - dump tab audit
-   - liquidation checklist
-3. подготовить внутреннюю форму данных под future auto-analysis
-
-### После этого
-**Подойти к Phase 7**
-
-Но только если:
-
-- Phase 6 manual layer уже ощущается полезной и оформленной
-- и мы не хотим ждать GGG, чтобы двигать продукт дальше
-
----
-
-## 6. Что нас сейчас блокирует извне
-
-### GGG OAuth
-
-Не получены:
-
-- `POE_OAUTH_CLIENT_ID`
-- `POE_OAUTH_CLIENT_SECRET`
-- stash-related scopes
-
-Это блокирует:
-
-- real account linking usage
 - live stash read
-- account-based analytics
+- tab grouping
+- dense / liquid / dump heuristics
 
-### PoE website trade flow
+Не хватает:
 
-Railway worker получает:
-
-- `403 Forbidden`
-
-Это блокирует:
-
-- production item trade URL polling
+- trustworthy anti-rate-limit fetching
+- market valuation
+- wealth summary
+- concrete sell recommendations
 
 ---
 
-## 7. Что не надо сейчас распылять
+## 4. Новый приоритет
 
-Пока не стоит уходить глубоко в:
+### Главная задача прямо сейчас
 
-- Telegram Mini App
-- public/community template marketplace
-- FunPay heavy logic
-- desktop / overlay tools
-- сложный AI без входных данных
+Сделать `Stage 2 / Stash Analytics v1` реально полезным.
+
+Это значит:
+
+1. перестать показывать пустой или ложный stash snapshot
+2. честно обрабатывать rate limits
+3. показывать пользователю, где лежит ликвидность
+4. дать хотя бы первый usable слой wealth / sell-first insights
+
+### Почему именно это
+
+Потому что OAuth и `account:stashes` уже открыли нам дверь в самый сильный дифференциатор продукта.
+
+Если stash раздел останется просто "списком вкладок", мы теряем самую ценную часть ассистента.
 
 ---
 
-## 8. Краткий вывод
+## 5. Конкретный маршрут
 
-Если совсем коротко:
+### Milestone A. Stash trust layer
+Цель: stash не должен врать
 
-- **Foundation — крепкий**
-- **Currency/economy/templates/builds — уже живые**
-- **Stash-analysis — начат правильно**
-- **Главные реальные блокеры — GGG OAuth и item trade polling**
+Сделать:
 
-Прямо сейчас проект лучше всего двигать так:
+- ограничение параллелизма запросов в PoE API
+- retry / backoff на `429`
+- короткий кэш снапшота
+- явная пометка partial/cached snapshot в UI
 
-1. **добить полезный manual слой Phase 6**
-2. **потом решить: идём в Phase 7 или возвращаемся к техническим долгам**
-3. **когда GGG откроют доступ — резко усиливаем account/stash сторону**
+### Milestone B. Stash valuation v1
+Цель: показать реальные кандидаты на продажу
+
+Сделать:
+
+- стабилизировать market source для stash categories
+- начать с валюты / fragments / essences / div cards / maps
+- вывести top sell candidates
+- вывести top valuable tabs
+
+### Milestone C. Wealth screen
+Цель: пользователь видит общую картину капитала
+
+Сделать:
+
+- команда `/wealth` или раздел внутри `/stash`
+- total estimated value
+- value by category
+- liquid vs slow assets
+
+### Milestone D. Dead Currency Detector
+Цель: показать залежавшуюся валюту и предложить конверсию
+
+Сделать:
+
+- identify bulky low-priority currency
+- пересчет в chaos/div
+- shortlist "можно слить без боли"
+
+### Milestone E. Character-aware assistant
+Цель: связать stash с персонажами
+
+Сделать:
+
+- active character context
+- build gaps
+- stash-to-build suggestions
+
+---
+
+## 6. Что откладываем
+
+Пока не лезем глубоко в:
+
+- FunPay / монетизацию
+- mini app
+- тяжелый AI advisor без нормального stash/account intelligence
+
+Сначала добиваем ядро пользы.
+
+---
+
+## 7. Что делаем в текущем цикле
+
+Текущий выбранный рабочий фокус:
+
+### `Stash Analytics v1: trust first`
+
+Внутри него:
+
+1. исправить ложные пустые snapshots
+2. стабилизировать чтение stash
+3. только потом наращивать wealth / sell-first аналитику
+
+Это и есть правильный следующий шаг после получения официальных OAuth scopes.
