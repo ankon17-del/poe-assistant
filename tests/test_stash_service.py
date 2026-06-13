@@ -108,10 +108,18 @@ def test_build_priced_candidates_uses_currency_source_for_liquid_tabs() -> None:
         ),
     )
 
-    candidates, source, estimate = asyncio.run(service._build_priced_candidates(snapshot))
+    candidates, category_totals, tab_totals, source, estimate = asyncio.run(service._build_priced_candidates(snapshot))
 
     assert source == "stash-market"
     assert estimate == 430.0
+    assert [(row.category_key, row.total_price_chaos) for row in category_totals] == [
+        ("currency", 400.0),
+        ("fragments", 30.0),
+    ]
+    assert [(row.tab_name, row.total_price_chaos) for row in tab_totals] == [
+        ("Currency", 400.0),
+        ("Fragments", 30.0),
+    ]
     assert candidates[0].item_name == "Divine Orb"
     assert candidates[0].total_price_chaos == 360.0
     assert candidates[1].item_name == "Chaos Orb"
@@ -163,10 +171,18 @@ def test_build_priced_candidates_supports_essences_and_div_cards() -> None:
         ),
     )
 
-    candidates, source, estimate = asyncio.run(service._build_priced_candidates(snapshot))
+    candidates, category_totals, tab_totals, source, estimate = asyncio.run(service._build_priced_candidates(snapshot))
 
     assert source == "stash-market"
     assert estimate == 112.0
+    assert [(row.category_key, row.total_price_chaos) for row in category_totals] == [
+        ("div_cards", 88.0),
+        ("essences", 24.0),
+    ]
+    assert [(row.tab_name, row.total_price_chaos) for row in tab_totals] == [
+        ("Div Cards", 88.0),
+        ("Essences", 24.0),
+    ]
     assert [candidate.item_name for candidate in candidates] == [
         "A Fate Worse Than Death",
         "Screaming Essence of Hatred",

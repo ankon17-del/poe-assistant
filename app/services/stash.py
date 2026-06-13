@@ -41,6 +41,8 @@ class StashPanelSummary:
     live_snapshot: StashSnapshot | None
     live_error: str | None
     priced_candidates: tuple["PricedStashCandidate", ...]
+    category_totals: tuple["StashCategoryTotal", ...]
+    tab_totals: tuple["StashTabTotal", ...]
     valuation_source: str | None
     estimated_liquid_chaos: float | None
     statuses: tuple[StashCapabilityStatus, ...]
@@ -53,6 +55,19 @@ class PricedStashCandidate:
     item_name: str
     quantity: int
     unit_price_chaos: float
+    total_price_chaos: float
+
+
+@dataclass(frozen=True)
+class StashCategoryTotal:
+    category_key: str
+    total_price_chaos: float
+
+
+@dataclass(frozen=True)
+class StashTabTotal:
+    tab_name: str
+    tab_type: str
     total_price_chaos: float
 
 
@@ -206,13 +221,17 @@ class StashService:
         live_snapshot: StashSnapshot | None = None
         live_error: str | None = None
         priced_candidates: tuple[PricedStashCandidate, ...] = ()
+        category_totals: tuple[StashCategoryTotal, ...] = ()
+        tab_totals: tuple[StashTabTotal, ...] = ()
         valuation_source: str | None = None
         estimated_liquid_chaos: float | None = None
         if include_live and integration and stash_scopes_ready:
             try:
                 live_snapshot = await PoeAccountApiService(self.session).get_stash_snapshot(user)
                 if live_snapshot:
-                    priced_candidates, valuation_source, estimated_liquid_chaos = await self._build_priced_candidates(live_snapshot)
+                    priced_candidates, category_totals, tab_totals, valuation_source, estimated_liquid_chaos = (
+                        await self._build_priced_candidates(live_snapshot)
+                    )
             except PoeAccountError as exc:
                 live_error = str(exc)
 
@@ -287,6 +306,8 @@ class StashService:
             live_snapshot=live_snapshot,
             live_error=live_error,
             priced_candidates=priced_candidates,
+            category_totals=category_totals,
+            tab_totals=tab_totals,
             valuation_source=valuation_source,
             estimated_liquid_chaos=estimated_liquid_chaos,
             statuses=statuses,
@@ -296,8 +317,16 @@ class StashService:
     async def _build_priced_candidates(
         self,
         snapshot: StashSnapshot,
-    ) -> tuple[tuple[PricedStashCandidate, ...], str | None, float | None]:
+    ) -> tuple[
+        tuple[PricedStashCandidate, ...],
+        tuple[StashCategoryTotal, ...],
+        tuple[StashTabTotal, ...],
+        str | None,
+        float | None,
+    ]:
         candidates: list[PricedStashCandidate] = []
+        category_totals: dict[str, Decimal] = {}
+        tab_totals: dict[tuple[str, str], Decimal] = {}
         source_labels: list[str] = []
         total_estimated = Decimal("0")
         supported_tab_types = {
@@ -308,14 +337,14 @@ class StashService:
             "MapStash",
         }
 
-        lookup_rows: list[tuple[str, str, str, int]] = []
+        lookup_rows: list[tuple[str, str, str, str, int]] = []
         tab_types = {
             tab.type
             for tab in snapshot.tabs
             if tab.type in supported_tab_types and tab.item_summaries
         }
         if not tab_types:
-            return (), None, None
+            return (), (), (), None, None
 
         market_indexes: dict[str, dict[str, Decimal]] = {}
         for tab_type in sorted(tab_types):
@@ -339,12 +368,12 @@ class StashService:
             if not tab_index:
                 continue
             for item in tab.item_summaries:
-                lookup_rows.append((tab.type, tab.name, item.name, item.quantity))
+                lookup_rows.append((tab.type, self._category_key_for_tab_type(tab.type), tab.name, item.name, item.quantity))
 
         if not lookup_rows:
-            return (), None, None
+            return (), (), (), None, None
 
-        for tab_type, tab_name, item_name, quantity in lookup_rows:
+        for tab_type, category_key, tab_name, item_name, quantity in lookup_rows:
             tab_index = market_indexes.get(tab_type)
             if not tab_index:
                 continue
@@ -353,6 +382,9 @@ class StashService:
                 continue
             total_price = unit_price * quantity
             total_estimated += total_price
+            category_totals[category_key] = category_totals.get(category_key, Decimal("0")) + total_price
+            tab_key = (tab_name, tab_type)
+            tab_totals[tab_key] = tab_totals.get(tab_key, Decimal("0")) + total_price
             if total_price < 5:
                 continue
 
@@ -367,9 +399,25 @@ class StashService:
             )
 
         candidates.sort(key=lambda candidate: (-candidate.total_price_chaos, -candidate.unit_price_chaos, candidate.item_name))
+        category_total_rows = tuple(
+            StashCategoryTotal(category_key=category_key, total_price_chaos=float(total_price))
+            for category_key, total_price in sorted(category_totals.items(), key=lambda item: (-item[1], item[0]))
+            if total_price >= 5
+        )
+        tab_total_rows = tuple(
+            StashTabTotal(tab_name=tab_name, tab_type=tab_type, total_price_chaos=float(total_price))
+            for (tab_name, tab_type), total_price in sorted(tab_totals.items(), key=lambda item: (-item[1], item[0][0]))
+            if total_price >= 5
+        )
         unique_sources = list(dict.fromkeys(source_labels))
         estimate = float(total_estimated) if total_estimated > 0 else None
-        return tuple(candidates[:8]), (", ".join(unique_sources) if unique_sources else None), estimate
+        return (
+            tuple(candidates[:8]),
+            category_total_rows[:5],
+            tab_total_rows[:5],
+            (", ".join(unique_sources) if unique_sources else None),
+            estimate,
+        )
 
     async def _build_currency_index_from_exchange(
         self,
@@ -400,6 +448,16 @@ class StashService:
     @staticmethod
     def _normalize_market_name(value: str) -> str:
         return "".join(ch for ch in value.lower() if ch.isalnum())
+
+    @staticmethod
+    def _category_key_for_tab_type(tab_type: str) -> str:
+        return {
+            "CurrencyStash": "currency",
+            "FragmentStash": "fragments",
+            "EssenceStash": "essences",
+            "DivinationCardStash": "div_cards",
+            "MapStash": "maps",
+        }.get(tab_type, "other")
 
     @classmethod
     def _lookup_market_price(

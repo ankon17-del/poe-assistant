@@ -103,6 +103,80 @@ def format_market_value(value: Decimal) -> str:
     return format_decimal(quantized)
 
 
+def stash_category_label(category_key: str, locale: str = DEFAULT_LOCALE) -> str:
+    labels = {
+        "ru": {
+            "currency": "Валюта",
+            "fragments": "Фрагменты",
+            "essences": "Эссенции",
+            "div_cards": "Div cards",
+            "maps": "Карты",
+            "other": "Прочее",
+        },
+        "en": {
+            "currency": "Currency",
+            "fragments": "Fragments",
+            "essences": "Essences",
+            "div_cards": "Div cards",
+            "maps": "Maps",
+            "other": "Other",
+        },
+        "fr": {
+            "currency": "Currency",
+            "fragments": "Fragments",
+            "essences": "Essences",
+            "div_cards": "Div cards",
+            "maps": "Maps",
+            "other": "Other",
+        },
+        "de": {
+            "currency": "Currency",
+            "fragments": "Fragments",
+            "essences": "Essences",
+            "div_cards": "Div cards",
+            "maps": "Maps",
+            "other": "Other",
+        },
+    }
+    localized = labels.get(locale, labels["en"])
+    return localized.get(category_key, category_key.replace("_", " ").title())
+
+
+def stash_tab_type_label(tab_type: str, locale: str = DEFAULT_LOCALE) -> str:
+    labels = {
+        "ru": {
+            "CurrencyStash": "currency",
+            "FragmentStash": "fragments",
+            "EssenceStash": "essences",
+            "DivinationCardStash": "div cards",
+            "MapStash": "maps",
+        },
+        "en": {
+            "CurrencyStash": "currency",
+            "FragmentStash": "fragments",
+            "EssenceStash": "essences",
+            "DivinationCardStash": "div cards",
+            "MapStash": "maps",
+        },
+        "fr": {
+            "CurrencyStash": "currency",
+            "FragmentStash": "fragments",
+            "EssenceStash": "essences",
+            "DivinationCardStash": "div cards",
+            "MapStash": "maps",
+        },
+        "de": {
+            "CurrencyStash": "currency",
+            "FragmentStash": "fragments",
+            "EssenceStash": "essences",
+            "DivinationCardStash": "div cards",
+            "MapStash": "maps",
+        },
+    }
+    localized = labels.get(locale, labels["en"])
+    return localized.get(tab_type, tab_type)
+
+
 def build_tracking_lines(item) -> list[str]:
     league_name = item.league.name if item.league else "Без лиги"
     game_label = "POE 2" if item.league and item.league.realm == "poe2" else "POE 1"
@@ -452,6 +526,18 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
         "fr": "par unite",
         "de": "pro Stueck",
     }.get(locale, "each")
+    category_breakdown_label = {
+        "ru": "Где лежит value по категориям",
+        "en": "Value by category",
+        "fr": "Value by category",
+        "de": "Value by category",
+    }.get(locale, "Value by category")
+    top_tabs_label = {
+        "ru": "Топ вкладки по value",
+        "en": "Top tabs by value",
+        "fr": "Top tabs by value",
+        "de": "Top tabs by value",
+    }.get(locale, "Top tabs by value")
     lines = [trm["title"], ""]
 
     if summary.account_connected:
@@ -499,6 +585,20 @@ def build_stash_text(summary, locale: str = DEFAULT_LOCALE) -> str:
             if summary.estimated_liquid_chaos is not None:
                 liquid_text = format_market_value(Decimal(str(summary.estimated_liquid_chaos)))
                 lines.append(f"{liquid_estimate_label}: ~ {liquid_text} chaos")
+                lines.append("")
+            if summary.category_totals:
+                lines.append(f"{category_breakdown_label}:")
+                for category in summary.category_totals:
+                    total_text = format_market_value(Decimal(str(category.total_price_chaos)))
+                    lines.append(f"- {stash_category_label(category.category_key, locale)} ~ {total_text} chaos")
+                lines.append("")
+            if summary.tab_totals:
+                lines.append(f"{top_tabs_label}:")
+                for tab_total in summary.tab_totals:
+                    total_text = format_market_value(Decimal(str(tab_total.total_price_chaos)))
+                    lines.append(
+                        f"- {tab_total.tab_name} ({stash_tab_type_label(tab_total.tab_type, locale)}) ~ {total_text} chaos"
+                    )
                 lines.append("")
             lines.append(f"{trm['sell']}:")
             for candidate in summary.priced_candidates[:6]:
